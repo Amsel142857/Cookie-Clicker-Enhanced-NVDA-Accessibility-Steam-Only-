@@ -611,60 +611,41 @@ Game.registerMod("nvda accessibility", {
 		lb.setAttribute('aria-label', lbl);
 	},
 	enhanceStatisticsScreen: function() {
-		var MOD = this;
-		var obs = new MutationObserver(function(m) { m.forEach(function(mut) { if (mut.addedNodes.length) MOD.labelStatisticsContent(); }); });
-		var menu = l('menu');
-		if (menu) obs.observe(menu, { childList: true, subtree: true });
+		// Removed - stats now labeled on-demand
 	},
 	labelStatisticsContent: function() {
 		var MOD = this, menu = l('menu');
 		if (!menu || Game.onMenu !== 'stats') return;
-		// Label section titles
-		menu.querySelectorAll('.title').forEach(function(t) {
-			t.setAttribute('role', 'heading');
-			t.setAttribute('aria-level', '2');
-		});
-		// Label subsection headers
-		menu.querySelectorAll('.listing b').forEach(function(s) {
-			if (s.textContent.includes('achievement') || s.textContent.includes('Achievement') ||
-			    s.textContent.includes('upgrade') || s.textContent.includes('Upgrade')) {
-				s.setAttribute('role', 'heading');
-				s.setAttribute('aria-level', '3');
+		if (MOD.statsLabelingInProgress) return;
+		MOD.statsLabelingInProgress = true;
+		// Process in batches to avoid blocking
+		var crates = menu.querySelectorAll('.crate:not([data-a11y-stats])');
+		var index = 0;
+		var batchSize = 20;
+		function processBatch() {
+			var end = Math.min(index + batchSize, crates.length);
+			for (var i = index; i < end; i++) {
+				var crate = crates[i];
+				crate.setAttribute('data-a11y-stats', '1');
+				var id = crate.getAttribute('data-id');
+				if (!id) continue;
+				if (crate.classList.contains('upgrade') && Game.UpgradesById[id]) {
+					MOD.labelStatsUpgradeIcon(crate, Game.UpgradesById[id], false);
+				} else if (crate.classList.contains('achievement') && Game.AchievementsById[id]) {
+					MOD.labelStatsAchievementIcon(crate, Game.AchievementsById[id], crate.classList.contains('shadow'));
+				}
 			}
-		});
-		// Label all crates in the stats menu
-		MOD.labelAllStatsCrates();
+			index = end;
+			if (index < crates.length) {
+				setTimeout(processBatch, 10);
+			} else {
+				MOD.statsLabelingInProgress = false;
+			}
+		}
+		setTimeout(processBatch, 50);
 	},
 	labelAllStatsCrates: function() {
-		var MOD = this;
-		var menu = l('menu');
-		if (!menu) return;
-		// Find ALL crate elements in the menu (crateBox contains them)
-		var crateBoxes = menu.querySelectorAll('.crateBox, .listing');
-		crateBoxes.forEach(function(box) {
-			// Find crates within this box - could be button or div
-			var crates = box.querySelectorAll('[data-id]');
-			crates.forEach(function(crate) {
-				var id = crate.getAttribute('data-id');
-				if (!id) return;
-				// Determine if upgrade or achievement by checking classes or trying both
-				var isUpgrade = crate.classList.contains('upgrade');
-				var isAchievement = crate.classList.contains('achievement');
-				var isShadow = crate.classList.contains('shadow');
-				var isHeavenly = crate.classList.contains('heavenly');
-				if (isUpgrade && Game.UpgradesById[id]) {
-					MOD.labelStatsUpgradeIcon(crate, Game.UpgradesById[id], isHeavenly);
-				} else if (isAchievement && Game.AchievementsById[id]) {
-					MOD.labelStatsAchievementIcon(crate, Game.AchievementsById[id], isShadow);
-				} else if (Game.UpgradesById[id]) {
-					// Fallback - check if it's an upgrade
-					MOD.labelStatsUpgradeIcon(crate, Game.UpgradesById[id], isHeavenly);
-				} else if (Game.AchievementsById[id]) {
-					// Fallback - check if it's an achievement
-					MOD.labelStatsAchievementIcon(crate, Game.AchievementsById[id], isShadow);
-				}
-			});
-		});
+		this.labelStatisticsContent();
 	},
 	labelStatsAchievementIcon: function(icon, ach, isShadow) {
 		if (!icon || !ach) return;
@@ -2210,66 +2191,38 @@ Game.registerMod("nvda accessibility", {
 	},
 	updateDynamicLabels: function() {
 		var MOD = this;
-		// Immediately refresh upgrade shop when game signals store needs refresh
+		// Skip most frames - only run every 60 ticks (2 seconds)
+		if (Game.T % 60 !== 0) {
+			// Only shimmer tracking runs more often (every 30 ticks)
+			if (Game.T % 30 === 0) {
+				MOD.trackShimmerAnnouncements();
+				MOD.updateShimmerOverlay();
+			}
+			return;
+		}
+		// Refresh upgrade shop only when store changes
 		if (Game.storeToRefresh !== MOD.lastStoreRefresh) {
 			MOD.lastStoreRefresh = Game.storeToRefresh;
+			setTimeout(function() { MOD.enhanceUpgradeShop(); }, 50);
+		}
+		// Minimal updates every 60 ticks
+		MOD.updateActiveBuffsPanel();
+		// Less frequent updates every 180 ticks (6 seconds)
+		if (Game.T % 180 === 0) {
 			MOD.enhanceUpgradeShop();
-		}
-		// Track shimmer appearances - only every 10 ticks (still responsive)
-		if (Game.T % 10 === 0) {
-			MOD.trackShimmerAnnouncements();
-			MOD.updateShimmerOverlay();
-		}
-		// Run building minigame labels every 60 ticks (less frequent)
-		if (Game.T % 60 === 0) {
-			MOD.enhanceBuildingMinigames();
-		}
-		// Refresh upgrade shop every 30 ticks (1 second) for responsive purchasing
-		if (Game.T % 30 === 0) {
-			MOD.enhanceUpgradeShop();
-		}
-		// Run moderate-frequency updates every 90 ticks
-		if (Game.T % 90 === 0) {
-			MOD.updateWrinklerLabels();
-			MOD.updateSugarLumpLabel();
-			MOD.checkVeilState();
-			MOD.updateBuffTracker();
-			MOD.updateAchievementTracker();
-			MOD.updateLegacyButtonLabel();
-			MOD.updateActiveBuffsPanel();
 			MOD.updateMainInterfaceDisplays();
 		}
-		// Run less frequent updates every 120 ticks
-		if (Game.T % 120 === 0) {
-			MOD.labelStatsUpgrades();
-			MOD.updateDragonLabels();
-			MOD.updateQoLLabels();
+		// Rare updates every 300 ticks (10 seconds)
+		if (Game.T % 300 === 0) {
 			MOD.filterUnownedBuildings();
 			MOD.labelBuildingLevels();
-			MOD.labelBuildingRows();
-			// Only update stats when the menu is open
-			if (Game.onMenu === 'stats') {
-				MOD.enhanceAchievementDetails();
-				MOD.labelStatisticsContent();
-			}
-			// Only update garden when visible
-			if (MOD.gardenReady() && Game.Objects['Farm'].onMinigame) {
-				if (!l('a11yGardenPanel')) {
-					MOD.enhanceGardenMinigame();
-				} else {
-					MOD.updateGardenPlotLabels();
-				}
-				MOD.labelOriginalGardenElements(Game.Objects['Farm'].minigame);
-			}
-			// Only update pantheon when visible
-			if (MOD.pantheonReady() && Game.Objects['Temple'].onMinigame) {
-				if (!l('a11yPantheonPanel')) {
-					MOD.createEnhancedPantheonPanel();
-				}
-			}
-			// Only update minigames when visible
-			if (Game.Objects['Wizard tower'] && Game.Objects['Wizard tower'].minigame && Game.Objects['Wizard tower'].onMinigame) MOD.enhanceGrimoireMinigame();
-			if (Game.Objects['Bank'] && Game.Objects['Bank'].minigame && Game.Objects['Bank'].onMinigame) MOD.enhanceStockMarketMinigame();
+		}
+		// Statistics menu - only label once when opened
+		if (Game.onMenu === 'stats' && !MOD.statsLabeled) {
+			MOD.statsLabeled = true;
+			setTimeout(function() { MOD.labelStatisticsContent(); }, 200);
+		} else if (Game.onMenu !== 'stats') {
+			MOD.statsLabeled = false;
 		}
 		if (Game.OnAscend) {
 			if (!MOD.wasOnAscend) {
@@ -2806,28 +2759,7 @@ Game.registerMod("nvda accessibility", {
 	// MODULE: Statistics Enhancement
 	// ============================================
 	enhanceAchievementDetails: function() {
-		var MOD = this;
-		var menu = l('menu');
-		if (!menu || Game.onMenu !== 'stats') return;
-		menu.querySelectorAll('.crate.achievement').forEach(function(crate) {
-			var id = crate.dataset.id;
-			if (!id) return;
-			var ach = Game.AchievementsById[id];
-			if (!ach) return;
-			var lbl = '';
-			if (ach.won) {
-				// Unlocked - show full info
-				var name = ach.dname || ach.name;
-				var desc = MOD.stripHtml(ach.desc || '');
-				lbl = name + '. Unlocked. ' + desc;
-			} else {
-				// Locked - hide name and description
-				lbl = '???. Locked.';
-			}
-			crate.setAttribute('aria-label', lbl);
-			crate.setAttribute('role', 'listitem');
-			crate.setAttribute('tabindex', '0');
-		});
+		// Consolidated into labelAllStatsCrates - no longer needed separately
 	},
 	getAchievementCondition: function(ach) {
 		if (!ach) return '';
@@ -3175,30 +3107,7 @@ Game.registerMod("nvda accessibility", {
 		}
 	},
 	labelStatsAchievements: function() {
-		var MOD = this;
-		if (Game.onMenu !== 'stats') return;
-		// Find all achievement crates in the stats menu
-		document.querySelectorAll('.crate').forEach(function(crate) {
-			var onclick = crate.getAttribute('onclick') || '';
-			var match = onclick.match(/Game\.AchievementsById\[(\d+)\]/);
-			if (!match) return;
-			var achId = parseInt(match[1]);
-			var ach = Game.AchievementsById[achId];
-			if (!ach) return;
-			// Build label - hide info for locked achievements
-			var lbl = '';
-			if (ach.won) {
-				var name = ach.dname || ach.name;
-				var desc = MOD.stripHtml(ach.desc || '');
-				var pool = (ach.pool === 'shadow') ? ' [Shadow Achievement]' : '';
-				lbl = name + '. Unlocked.' + pool + ' ' + desc;
-			} else {
-				lbl = '???. Locked.';
-			}
-			crate.setAttribute('aria-label', lbl);
-			crate.setAttribute('role', 'listitem');
-			crate.setAttribute('tabindex', '0');
-		});
+		// Consolidated into labelAllStatsCrates - no longer needed separately
 	},
 	labelStatsScreen: function() {
 		var MOD = this;
