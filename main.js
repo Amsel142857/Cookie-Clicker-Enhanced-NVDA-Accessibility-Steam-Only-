@@ -1688,38 +1688,39 @@ Game.registerMod("nvda accessibility", {
 			// Insert before the products container (after upgrades, before buildings)
 			products.parentNode.insertBefore(buildingsHeading, products);
 		}
-		// Note: Store heading already exists via #storeTitle element
-		// Add heading for selectors area
-		MOD.addSelectorsHeading();
-	},
-	addSelectorsHeading: function() {
-		var MOD = this;
-		// Find the selectors container (usually above the store)
-		var storePreButtons = document.querySelector('.storePreButtons');
-		if (storePreButtons && !l('a11ySelectorsHeading')) {
-			var selectorsHeading = document.createElement('h3');
-			selectorsHeading.id = 'a11ySelectorsHeading';
-			selectorsHeading.textContent = 'Appearance Selectors';
-			selectorsHeading.style.cssText = 'position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;';
-			storePreButtons.insertBefore(selectorsHeading, storePreButtons.firstChild);
-			storePreButtons.setAttribute('role', 'region');
-			storePreButtons.setAttribute('aria-labelledby', 'a11ySelectorsHeading');
-		}
 	},
 	enhanceUpgradeShop: function() {
 		var MOD = this;
-		for (var i in Game.UpgradesInStore) { var u = Game.UpgradesInStore[i]; if (u) MOD.populateUpgradeLabel(u); }
+		// Label all upgrades in store
+		for (var i in Game.UpgradesInStore) {
+			var u = Game.UpgradesInStore[i];
+			if (u) MOD.populateUpgradeLabel(u);
+		}
 		var uc = l('upgrades');
-		if (uc) uc.querySelectorAll('.crate.upgrade, button.crate.upgrade').forEach(function(c) {
-			var id = c.dataset.id;
-			if (id && Game.UpgradesById[id]) MOD.labelUpgradeCrate(c, Game.UpgradesById[id]);
-		});
+		if (uc) {
+			// Add Store heading right before the upgrades container
+			if (!l('a11yStoreHeading')) {
+				var storeHeading = document.createElement('h3');
+				storeHeading.id = 'a11yStoreHeading';
+				storeHeading.textContent = 'Store';
+				storeHeading.style.cssText = 'position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;';
+				uc.parentNode.insertBefore(storeHeading, uc);
+			}
+			// Label all upgrade crates
+			uc.querySelectorAll('.crate.upgrade, button.crate.upgrade').forEach(function(c) {
+				var id = c.dataset.id;
+				if (id && Game.UpgradesById[id]) {
+					var upg = Game.UpgradesById[id];
+					MOD.labelUpgradeCrate(c, upg, false, upg.pool === 'toggle');
+				}
+			});
+		}
 		var vc = l('vaultUpgrades');
 		if (vc) {
 			vc.setAttribute('role', 'region'); vc.setAttribute('aria-label', 'Vaulted');
 			vc.querySelectorAll('.crate.upgrade').forEach(function(c) {
 				var id = c.dataset.id;
-				if (id && Game.UpgradesById[id]) MOD.labelUpgradeCrate(c, Game.UpgradesById[id], true);
+				if (id && Game.UpgradesById[id]) MOD.labelUpgradeCrate(c, Game.UpgradesById[id], true, false);
 			});
 		}
 	},
@@ -1846,17 +1847,29 @@ Game.registerMod("nvda accessibility", {
 			var n = u.dname || u.name;
 			var p = Beautify(Math.round(u.getPrice()));
 			var s = u.bought ? 'Purchased' : (u.canBuy() ? 'Affordable' : 'Too expensive');
-			var t = n + '. ' + s + '. ';
+			var t = n + '. ';
+			// Mark toggle upgrades as special options
+			if (u.pool === 'toggle') {
+				t += '[Special Option]. ';
+			}
+			t += s + '. ';
 			if (!u.bought) {
 				t += 'Price: ' + p + '. ';
 				// Always show time until affordable
 				t += MOD.getTimeUntilAfford(u.getPrice()) + '. ';
 			}
-			if (u.desc) t += MOD.stripHtml(u.desc);
+			// For toggle upgrades, use our enhanced effect description
+			if (u.pool === 'toggle') {
+				t += MOD.getToggleUpgradeEffect(u);
+			} else if (u.desc) {
+				t += MOD.stripHtml(u.desc);
+			}
 			a.innerHTML = t;
 		}
-		// Also add a visible/focusable text element below the upgrade
-		MOD.ensureUpgradeInfoText(u);
+		// Also add a visible/focusable text element below the upgrade (skip for toggles - they have click menus)
+		if (u.pool !== 'toggle') {
+			MOD.ensureUpgradeInfoText(u);
+		}
 	},
 	ensureUpgradeInfoText: function(u) {
 		var MOD = this;
@@ -1894,14 +1907,19 @@ Game.registerMod("nvda accessibility", {
 			}
 		}
 	},
-	labelUpgradeCrate: function(c, u, v) {
+	labelUpgradeCrate: function(c, u, v, isToggle) {
 		var MOD = this;
 		if (!c || !u) return;
 		var n = u.dname || u.name;
-		// Simplified main button - just name (and vaulted status if applicable)
+		// Build comprehensive label
 		var lbl = n;
 		if (v) lbl += ' (Vaulted)';
-		if (u.bought) lbl = n + ' (Purchased)';
+		if (u.bought) lbl += ' (Purchased)';
+		// For toggle upgrades, add category and effect description
+		if (isToggle || u.pool === 'toggle') {
+			lbl += ' [Special Option]. ';
+			lbl += MOD.getToggleUpgradeEffect(u);
+		}
 		c.setAttribute('aria-label', lbl);
 		c.setAttribute('role', 'button');
 		c.setAttribute('tabindex', '0');
@@ -1909,6 +1927,39 @@ Game.registerMod("nvda accessibility", {
 			c.dataset.a11yEnhanced = 'true';
 			c.addEventListener('keydown', function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); c.click(); } });
 		}
+	},
+	getToggleUpgradeEffect: function(u) {
+		var MOD = this;
+		if (!u) return '';
+		var name = u.name.toLowerCase();
+		// Provide clear effect descriptions for known toggle upgrades
+		if (name === 'elder pledge') {
+			var duration = Game.Has('Sacrificial rolling pins') ? '60 minutes' : '30 minutes';
+			return 'Temporarily stops the Grandmapocalypse for ' + duration + '. Collects all wrinklers. Golden cookies return during this time. Cost increases each use.';
+		}
+		if (name === 'elder covenant') {
+			return 'Permanently stops the Grandmapocalypse but reduces CpS by 5%. No more wrath cookies or wrinklers.';
+		}
+		if (name === 'revoke elder covenant') {
+			return 'Cancels the Elder Covenant. Grandmapocalypse resumes and you regain the 5% CpS.';
+		}
+		if (name === 'milk selector') {
+			return 'Opens a menu to choose which milk is displayed. Cosmetic only.';
+		}
+		if (name === 'background selector') {
+			return 'Opens a menu to choose the game background. Cosmetic only.';
+		}
+		if (name === 'golden switch') {
+			return 'Toggle: When ON, Golden Cookies stop spawning but you gain 50% more CpS. Turn OFF to resume Golden Cookies.';
+		}
+		if (name === 'shimmering veil') {
+			return 'Toggle: When active, buildings produce 50% more but Golden Cookies break the veil. Heavenly upgrade required.';
+		}
+		if (name.includes('season')) {
+			return 'Switches the current season. Each season has unique upgrades and cookies.';
+		}
+		// Default: use the upgrade's description
+		return MOD.stripHtml(u.desc || '');
 	},
 	enhanceAscensionUI: function() {
 		var MOD = this;
@@ -2497,30 +2548,30 @@ Game.registerMod("nvda accessibility", {
 		var MOD = this;
 		var oldOverlay = l('a11yShimmerOverlay');
 		if (oldOverlay) oldOverlay.remove();
+		// Create a simple container for shimmer buttons (no heading)
 		var overlay = document.createElement('div');
 		overlay.id = 'a11yShimmerOverlay';
-		overlay.setAttribute('role', 'region');
-		overlay.setAttribute('aria-labelledby', 'a11yShimmerHeading');
-		// Position after the cookie area, more visible
-		overlay.style.cssText = 'background:#1a1a0a;border:2px solid #fc0;padding:10px;margin:10px 0;';
-		// Create heading
-		var heading = document.createElement('h2');
-		heading.id = 'a11yShimmerHeading';
-		heading.textContent = 'Golden Cookies & Shimmers';
-		heading.style.cssText = 'color:#fc0;margin:0 0 10px 0;font-size:16px;';
-		overlay.appendChild(heading);
+		overlay.style.cssText = 'padding:2px;';
 		// Create container for shimmer buttons
 		var container = document.createElement('div');
 		container.id = 'a11yShimmerButtons';
-		container.style.cssText = 'min-height:30px;';
-		container.innerHTML = '<div style="color:#888;font-style:italic;" tabindex="0">No active shimmers</div>';
 		overlay.appendChild(container);
-		// Insert after the products section (buildings)
-		var products = l('products');
-		if (products && products.parentNode) {
-			products.parentNode.insertBefore(overlay, products.nextSibling);
+		// Insert at top - after version number, before cookies display
+		// Look for the version element or the top section
+		var versionEl = l('versionNumber');
+		var topSection = l('topBar') || l('sectionLeft') || document.querySelector('.section');
+		if (versionEl && versionEl.parentNode) {
+			// Insert right after version number
+			if (versionEl.nextSibling) {
+				versionEl.parentNode.insertBefore(overlay, versionEl.nextSibling);
+			} else {
+				versionEl.parentNode.appendChild(overlay);
+			}
+		} else if (topSection) {
+			topSection.insertBefore(overlay, topSection.firstChild);
 		} else {
-			document.body.appendChild(overlay);
+			// Fallback - insert at start of body
+			document.body.insertBefore(overlay, document.body.firstChild);
 		}
 	},
 	updateShimmerOverlay: function() {
@@ -2532,23 +2583,24 @@ Game.registerMod("nvda accessibility", {
 			container = l('a11yShimmerButtons');
 			if (!container) return;
 		}
+		// If no shimmers, clear the container (no message needed)
 		if (!Game.shimmers || Game.shimmers.length === 0) {
-			container.innerHTML = '<div style="color:#888;font-style:italic;" tabindex="0">No active shimmers</div>';
+			container.innerHTML = '';
 			return;
 		}
 		var html = '';
 		Game.shimmers.forEach(function(shimmer, idx) {
 			var variant = MOD.getShimmerVariantName(shimmer);
-			// Show remaining time if available
+			// Show remaining time
 			var timeLeft = '';
 			if (shimmer.life !== undefined) {
 				var secondsLeft = Math.ceil(shimmer.life / Game.fps);
-				timeLeft = ' (' + secondsLeft + 's remaining)';
+				timeLeft = ', ' + secondsLeft + ' seconds';
 			}
 			html += '<button type="button" id="a11yShimmer' + idx + '" ';
-			html += 'aria-label="' + variant + timeLeft + '. Click or press Enter to collect." ';
-			html += 'style="display:block;width:100%;padding:10px;margin:4px 0;background:#333;border:2px solid #fc0;color:#fff;cursor:pointer;font-size:14px;">';
-			html += variant + timeLeft + ' - Click to collect';
+			html += 'aria-label="' + variant + timeLeft + '" ';
+			html += 'style="display:inline-block;padding:6px 12px;margin:2px;background:#333;border:2px solid #fc0;color:#fc0;cursor:pointer;font-size:13px;">';
+			html += variant;
 			html += '</button>';
 		});
 		container.innerHTML = html;
