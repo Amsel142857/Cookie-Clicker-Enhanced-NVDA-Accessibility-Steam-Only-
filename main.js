@@ -1849,42 +1849,41 @@ Game.registerMod("nvda accessibility", {
 			var t = n + '. ' + s + '. ';
 			if (!u.bought) {
 				t += 'Price: ' + p + '. ';
-				// Add time until affordable if not already affordable
-				if (!u.canBuy()) {
-					t += 'Time until affordable: ' + MOD.getTimeUntilAfford(u.getPrice()) + '. ';
-				}
+				// Always show time until affordable
+				t += MOD.getTimeUntilAfford(u.getPrice()) + '. ';
 			}
 			if (u.desc) t += MOD.stripHtml(u.desc);
 			a.innerHTML = t;
 		}
-		// Also add a visible text element below the upgrade for screen readers
+		// Also add a visible/focusable text element below the upgrade
 		MOD.ensureUpgradeInfoText(u);
 	},
 	ensureUpgradeInfoText: function(u) {
 		var MOD = this;
 		if (!u || u.bought) return;
-		// Find the upgrade crate element
-		var crate = document.querySelector('.crate.upgrade[data-id="' + u.id + '"], button.crate.upgrade[data-id="' + u.id + '"]');
+		// Find the upgrade crate element in the upgrades container
+		var upgradesContainer = l('upgrades');
+		if (!upgradesContainer) return;
+		var crate = upgradesContainer.querySelector('[data-id="' + u.id + '"]');
 		if (!crate) return;
 		// Check if info text already exists
 		var textId = 'a11y-upgrade-info-' + u.id;
 		var existingText = l(textId);
-		// Build the info text
+		// Build the info text - always show time
 		var price = Beautify(Math.round(u.getPrice()));
-		var canBuy = u.canBuy();
-		var infoText = 'Cost: ' + price;
-		if (!canBuy) {
-			infoText += '. Time until affordable: ' + MOD.getTimeUntilAfford(u.getPrice());
-		}
-		infoText += '. ' + MOD.stripHtml(u.desc || '');
+		var timeText = MOD.getTimeUntilAfford(u.getPrice());
+		var infoText = 'Cost: ' + price + '. ' + timeText + '. ' + MOD.stripHtml(u.desc || '');
 		if (existingText) {
 			existingText.textContent = infoText;
+			existingText.setAttribute('aria-label', infoText);
 		} else {
-			// Create info text element (similar to Grimoire effect text)
+			// Create info text element (like Grimoire effect text - focusable but not a button)
 			var infoDiv = document.createElement('div');
 			infoDiv.id = textId;
-			infoDiv.style.cssText = 'display:block;padding:4px;margin:2px 0;font-size:11px;color:#ccc;background:#222;';
+			infoDiv.className = 'a11y-upgrade-info';
+			infoDiv.style.cssText = 'display:block;padding:6px;margin:4px 0;font-size:12px;color:#ccc;background:#1a1a1a;border:1px solid #444;';
 			infoDiv.setAttribute('tabindex', '0');
+			infoDiv.setAttribute('role', 'note');
 			infoDiv.setAttribute('aria-label', infoText);
 			infoDiv.textContent = infoText;
 			// Insert after the crate
