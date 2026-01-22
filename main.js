@@ -3,6 +3,13 @@ Game.registerMod("nvda accessibility", {
 		var MOD = this;
 		this.createLiveRegion();
 		this.createAssertiveLiveRegion();
+		// Load external modules
+		MOD.loadModule('modules/statistics.js', function() {
+			console.log('[A11y Mod] Statistics module loaded');
+			if (typeof StatisticsModule !== 'undefined') {
+				MOD.StatisticsModule = StatisticsModule;
+			}
+		});
 		if (!Game.prefs.screenreader) { Game.prefs.screenreader = 1; }
 		if (Game.volume !== undefined) { Game.volumeMusic = 0; }
 		this.lastVeilState = null;
@@ -35,6 +42,8 @@ Game.registerMod("nvda accessibility", {
 			MOD.createMainInterfaceEnhancements();
 			MOD.filterUnownedBuildings();
 			MOD.labelBuildingLevels();
+			// Initialize Statistics Module
+			if (MOD.StatisticsModule) MOD.StatisticsModule.init();
 		}, 500);
 		Game.registerHook('draw', function() {
 			MOD.updateDynamicLabels();
@@ -51,10 +60,12 @@ Game.registerMod("nvda accessibility", {
 				MOD.createActiveBuffsPanel();
 				MOD.createMainInterfaceEnhancements();
 				MOD.filterUnownedBuildings();
+				// Re-initialize Statistics Module after reset
+				if (MOD.StatisticsModule) MOD.StatisticsModule.init();
 			}, 100);
 		});
-		Game.Notify('Accessibility Enhanced', 'Version 6 with enhanced modules.', [10, 0], 6);
-		this.announce('NVDA Accessibility mod version 6 loaded. New features: Active Buffs panel, CPS display, building levels, enhanced Pantheon, shimmer overlay.');
+		Game.Notify('Accessibility Enhanced', 'Version 7 with Statistics module.', [10, 0], 6);
+		this.announce('NVDA Accessibility mod version 7 loaded. New: Statistics module for enhanced upgrade and achievement labels.');
 	},
 	overrideDrawBuildings: function() {
 		var MOD = this;
@@ -246,6 +257,13 @@ Game.registerMod("nvda accessibility", {
 	announceUrgent: function(t) {
 		var a = l('srAnnouncerUrgent');
 		if (a) { a.textContent = ''; setTimeout(function() { a.textContent = t; }, 50); }
+	},
+	loadModule: function(path, callback) {
+		var script = document.createElement('script');
+		script.src = Game.resPath + 'mods/local/nvdaAccessibility/' + path;
+		script.onload = callback || function() {};
+		script.onerror = function() { console.error('[A11y Mod] Failed to load module: ' + path); };
+		document.head.appendChild(script);
 	},
 	createWrinklerOverlays: function() {
 		var MOD = this;
@@ -1994,12 +2012,16 @@ Game.registerMod("nvda accessibility", {
 		}
 		if (Game.T % 60 === 0) {
 			MOD.enhanceUpgradeShop();
+			if (MOD.StatisticsModule) MOD.StatisticsModule.labelUpgrades();
 			MOD.updateDragonLabels();
 			MOD.updateQoLLabels();
 			MOD.filterUnownedBuildings();
 			MOD.labelBuildingLevels();
 			MOD.labelBuildingRows();
-			if (Game.onMenu === 'stats') MOD.enhanceAchievementDetails();
+			if (Game.onMenu === 'stats') {
+				MOD.enhanceAchievementDetails();
+				if (MOD.StatisticsModule) MOD.StatisticsModule.labelStats();
+			}
 			if (MOD.gardenReady()) {
 				// Create panel if it doesn't exist, otherwise just update labels
 				if (!l('a11yGardenPanel')) {
@@ -2021,10 +2043,12 @@ Game.registerMod("nvda accessibility", {
 				MOD.wasOnAscend = true;
 				MOD.enhanceHeavenlyUpgrades();
 				MOD.enhancePermanentUpgradeSlots();
+				if (MOD.StatisticsModule) MOD.StatisticsModule.labelHeavenly();
 			}
 			if (MOD.lastHeavenlyChips !== Game.heavenlyChips) {
 				MOD.lastHeavenlyChips = Game.heavenlyChips;
 				MOD.enhanceHeavenlyUpgrades();
+				if (MOD.StatisticsModule) MOD.StatisticsModule.labelHeavenly();
 			}
 		} else MOD.wasOnAscend = false;
 	},
