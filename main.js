@@ -17,6 +17,9 @@ Game.registerMod("nvda accessibility", {
 		this.lastAchievementCount = 0;
 		this.wrinklerOverlays = [];
 		this.lastLumpRipe = false;
+		// Shimmer tracking - announce once on appear and once when fading
+		this.announcedShimmers = {}; // Track shimmers we've announced appearing
+		this.fadingShimmers = {}; // Track shimmers we've announced as fading
 		// Override Game.DrawBuildings to inject accessibility labels
 		MOD.overrideDrawBuildings();
 		// Track if we've announced the fix
@@ -679,12 +682,17 @@ Game.registerMod("nvda accessibility", {
 	},
 	setupGoldenCookieAnnouncements: function() {
 		var MOD = this;
+		// Override pop functions to announce when clicked
 		if (Game.shimmerTypes && Game.shimmerTypes.golden) {
 			var orig = Game.shimmerTypes.golden.popFunc;
 			Game.shimmerTypes.golden.popFunc = function(me) {
 				var r = orig.call(this, me);
-				if (me.lastPopText) MOD.announceUrgent(MOD.stripHtml(me.lastPopText));
-				else MOD.announceUrgent(Game.lastWrath ? 'Wrath cookie clicked!' : 'Golden cookie clicked!');
+				var variant = MOD.getShimmerVariantName(me);
+				if (me.lastPopText) {
+					MOD.announceUrgent(variant + ' clicked! ' + MOD.stripHtml(me.lastPopText));
+				} else {
+					MOD.announceUrgent(variant + ' clicked!');
+				}
 				return r;
 			};
 		}
@@ -695,6 +703,80 @@ Game.registerMod("nvda accessibility", {
 				MOD.announceUrgent('Reindeer clicked!');
 				return r;
 			};
+		}
+	},
+	/**
+	 * Get the display name for a shimmer based on type, wrath status, and season
+	 */
+	getShimmerVariantName: function(shimmer) {
+		if (!shimmer) return 'Unknown';
+
+		if (shimmer.type === 'reindeer') {
+			return 'Reindeer';
+		}
+
+		if (shimmer.type === 'golden') {
+			// Check for wrath cookie first
+			if (shimmer.wrath) {
+				// Check seasonal variants for wrath cookies
+				if (Game.season === 'easter') return 'Wrath Bunny';
+				if (Game.season === 'valentines') return 'Wrath Heart';
+				if (Game.season === 'halloween') return 'Wrath Pumpkin';
+				if (Game.season === 'fools') return 'Wrath Contract';
+				return 'Wrath Cookie';
+			} else {
+				// Golden cookie - check seasonal variants
+				if (Game.season === 'easter') return 'Golden Bunny';
+				if (Game.season === 'valentines') return 'Golden Heart';
+				if (Game.season === 'halloween') return 'Golden Pumpkin';
+				if (Game.season === 'fools') return 'Golden Contract';
+				return 'Golden Cookie';
+			}
+		}
+
+		return 'Shimmer';
+	},
+	/**
+	 * Track and announce shimmers - called from updateDynamicLabels
+	 * Announces once when appearing, once when fading (2 seconds before disappearing)
+	 */
+	trackShimmerAnnouncements: function() {
+		var MOD = this;
+		if (!Game.shimmers) return;
+
+		var currentShimmerIds = {};
+		var FADE_WARNING_FRAMES = 60; // 2 seconds at 30fps
+
+		// Process each active shimmer
+		Game.shimmers.forEach(function(shimmer) {
+			var id = shimmer.id;
+			currentShimmerIds[id] = true;
+
+			// Get variant name
+			var variant = MOD.getShimmerVariantName(shimmer);
+
+			// Announce appearance (only once per shimmer)
+			if (!MOD.announcedShimmers[id]) {
+				MOD.announcedShimmers[id] = true;
+				MOD.announceUrgent('A ' + variant + ' has appeared!');
+			}
+
+			// Check if fading (2 seconds before disappearing)
+			// shimmer.life is remaining life in frames, shimmer.dur is total duration
+			if (shimmer.life !== undefined && shimmer.life <= FADE_WARNING_FRAMES) {
+				if (!MOD.fadingShimmers[id]) {
+					MOD.fadingShimmers[id] = true;
+					MOD.announce(variant + ' is fading!');
+				}
+			}
+		});
+
+		// Clean up tracking for shimmers that no longer exist
+		for (var id in MOD.announcedShimmers) {
+			if (!currentShimmerIds[id]) {
+				delete MOD.announcedShimmers[id];
+				delete MOD.fadingShimmers[id];
+			}
 		}
 	},
 	updateBuffTracker: function() {
@@ -1991,6 +2073,8 @@ Game.registerMod("nvda accessibility", {
 	},
 	updateDynamicLabels: function() {
 		var MOD = this;
+		// Track shimmer appearances and fading every frame for timely announcements
+		MOD.trackShimmerAnnouncements();
 		// Run building minigame labels every 15 ticks to catch UI refreshes
 		if (Game.T % 15 === 0) {
 			MOD.enhanceBuildingMinigames();
@@ -2351,7 +2435,7 @@ Game.registerMod("nvda accessibility", {
 		overlay.id = 'a11yShimmerOverlay';
 		overlay.setAttribute('role', 'region');
 		overlay.setAttribute('aria-label', 'Special Cookies');
-		overlay.setAttribute('aria-live', 'polite');
+		// Note: No aria-live here - announcements are handled by trackShimmerAnnouncements
 		overlay.style.cssText = 'position:fixed;top:10px;left:10px;background:#000;border:2px solid #fc0;padding:10px;z-index:99999;display:none;';
 		document.body.appendChild(overlay);
 	},
@@ -2365,14 +2449,15 @@ Game.registerMod("nvda accessibility", {
 		}
 		var html = '<h3 style="color:#fc0;margin:0 0 5px 0;">Active Shimmers:</h3>';
 		Game.shimmers.forEach(function(shimmer, idx) {
-			var type = 'Unknown';
-			if (shimmer.type === 'golden') {
-				type = shimmer.wrath ? 'Wrath Cookie' : 'Golden Cookie';
-			} else if (shimmer.type === 'reindeer') {
-				type = 'Reindeer';
+			var variant = MOD.getShimmerVariantName(shimmer);
+			// Show remaining time if available
+			var timeLeft = '';
+			if (shimmer.life !== undefined && shimmer.dur !== undefined) {
+				var secondsLeft = Math.ceil(shimmer.life / Game.fps);
+				timeLeft = ' (' + secondsLeft + 's)';
 			}
 			html += '<button type="button" id="a11yShimmer' + idx + '" style="display:block;width:100%;padding:8px;margin:2px 0;background:#333;border:1px solid #fc0;color:#fff;cursor:pointer;">';
-			html += type + ' - Click to collect';
+			html += variant + timeLeft + ' - Click to collect';
 			html += '</button>';
 		});
 		overlay.innerHTML = html;
