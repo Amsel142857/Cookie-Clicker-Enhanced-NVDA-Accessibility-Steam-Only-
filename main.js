@@ -612,78 +612,95 @@ Game.registerMod("nvda accessibility", {
 	},
 	labelStatisticsContent: function() {
 		var MOD = this, menu = l('menu');
-		if (!menu) return;
-		menu.querySelectorAll('.title').forEach(function(t) { t.setAttribute('role', 'heading'); t.setAttribute('aria-level', '2'); });
-		menu.querySelectorAll('.listing b').forEach(function(s) { if (s.textContent.endsWith(':')) { s.setAttribute('role', 'heading'); s.setAttribute('aria-level', '3'); } });
-		MOD.enhanceAchievementIcons();
-		MOD.enhanceUpgradeIcons();
+		if (!menu || Game.onMenu !== 'stats') return;
+		// Label section titles
+		menu.querySelectorAll('.title').forEach(function(t) {
+			t.setAttribute('role', 'heading');
+			t.setAttribute('aria-level', '2');
+		});
+		// Label subsection headers
+		menu.querySelectorAll('.listing b').forEach(function(s) {
+			if (s.textContent.includes('achievement') || s.textContent.includes('Achievement') ||
+			    s.textContent.includes('upgrade') || s.textContent.includes('Upgrade')) {
+				s.setAttribute('role', 'heading');
+				s.setAttribute('aria-level', '3');
+			}
+		});
+		// Label all crates in the stats menu
+		MOD.labelAllStatsCrates();
 	},
-	enhanceAchievementIcons: function() {
-		var MOD = this, menu = l('menu');
+	labelAllStatsCrates: function() {
+		var MOD = this;
+		var menu = l('menu');
 		if (!menu) return;
-		// Find all achievement crates (both button and div versions)
-		menu.querySelectorAll('.crate.achievement, button.crate.achievement').forEach(function(i) {
-			var id = i.dataset.id || i.getAttribute('data-id');
-			if (id && Game.AchievementsById[id]) MOD.labelAchievementIcon(i, Game.AchievementsById[id]);
+		// Find ALL crate elements in the menu (crateBox contains them)
+		var crateBoxes = menu.querySelectorAll('.crateBox, .listing');
+		crateBoxes.forEach(function(box) {
+			// Find crates within this box - could be button or div
+			var crates = box.querySelectorAll('[data-id]');
+			crates.forEach(function(crate) {
+				var id = crate.getAttribute('data-id');
+				if (!id) return;
+				// Determine if upgrade or achievement by checking classes or trying both
+				var isUpgrade = crate.classList.contains('upgrade');
+				var isAchievement = crate.classList.contains('achievement');
+				var isShadow = crate.classList.contains('shadow');
+				var isHeavenly = crate.classList.contains('heavenly');
+				if (isUpgrade && Game.UpgradesById[id]) {
+					MOD.labelStatsUpgradeIcon(crate, Game.UpgradesById[id], isHeavenly);
+				} else if (isAchievement && Game.AchievementsById[id]) {
+					MOD.labelStatsAchievementIcon(crate, Game.AchievementsById[id], isShadow);
+				} else if (Game.UpgradesById[id]) {
+					// Fallback - check if it's an upgrade
+					MOD.labelStatsUpgradeIcon(crate, Game.UpgradesById[id], isHeavenly);
+				} else if (Game.AchievementsById[id]) {
+					// Fallback - check if it's an achievement
+					MOD.labelStatsAchievementIcon(crate, Game.AchievementsById[id], isShadow);
+				}
+			});
 		});
 	},
-	enhanceUpgradeIcons: function() {
-		var MOD = this, menu = l('menu');
-		if (!menu) return;
-		// Find all upgrade crates (both button and div versions)
-		menu.querySelectorAll('.crate.upgrade, button.crate.upgrade').forEach(function(i) {
-			var id = i.dataset.id || i.getAttribute('data-id');
-			if (id && Game.UpgradesById[id]) MOD.labelUpgradeIcon(i, Game.UpgradesById[id]);
-		});
-	},
-	labelAchievementIcon: function(icon, ach) {
+	labelStatsAchievementIcon: function(icon, ach, isShadow) {
 		if (!icon || !ach) return;
 		var MOD = this;
 		var n = ach.dname || ach.name;
 		var d = MOD.stripHtml(ach.desc || '');
 		var w = ach.won ? 'Unlocked' : 'Locked';
-		var pool = ach.pool === 'shadow' ? ' [Shadow Achievement]' : '';
-		var lbl = 'Achievement: ' + n + '. Status: ' + w + '.' + pool + ' ' + d;
-		// Populate the aria-labelledby target label if it exists
+		var pool = (isShadow || ach.pool === 'shadow') ? ' [Shadow Achievement]' : '';
+		var lbl = n + '. ' + w + '.' + pool + ' ' + d;
+		// Populate the aria-labelledby target label (created by game when screenreader=1)
 		var ariaLabel = l('ariaReader-achievement-' + ach.id);
 		if (ariaLabel) {
 			ariaLabel.textContent = lbl;
 		}
-		// Also set aria-label directly as fallback
+		// Also set aria-label directly
 		icon.setAttribute('aria-label', lbl);
-		icon.setAttribute('role', 'button');
-		icon.setAttribute('tabindex', '0');
-		if (!icon.dataset.a11yEnhanced) {
-			icon.dataset.a11yEnhanced = 'true';
-			icon.addEventListener('keydown', function(e) {
-				if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); icon.click(); }
-			});
-		}
+		if (!icon.getAttribute('role')) icon.setAttribute('role', 'button');
+		if (!icon.getAttribute('tabindex')) icon.setAttribute('tabindex', '0');
 	},
-	labelUpgradeIcon: function(icon, upg) {
+	labelStatsUpgradeIcon: function(icon, upg, isHeavenly) {
 		if (!icon || !upg) return;
 		var MOD = this;
 		var n = upg.dname || upg.name;
 		var d = MOD.stripHtml(upg.desc || '');
 		var w = upg.bought ? 'Owned' : 'Not owned';
-		var pool = upg.pool === 'prestige' ? ' [Heavenly Upgrade]' : '';
-		var lbl = 'Upgrade: ' + n + '. Status: ' + w + '.' + pool + ' ' + d;
-		// Populate the aria-labelledby target label if it exists
+		var pool = (isHeavenly || upg.pool === 'prestige') ? ' [Heavenly Upgrade]' : '';
+		var lbl = n + '. ' + w + '.' + pool + ' ' + d;
+		// Populate the aria-labelledby target label (created by game when screenreader=1)
 		var ariaLabel = l('ariaReader-upgrade-' + upg.id);
 		if (ariaLabel) {
 			ariaLabel.textContent = lbl;
 		}
-		// Also set aria-label directly as fallback
+		// Also set aria-label directly
 		icon.setAttribute('aria-label', lbl);
-		icon.setAttribute('role', 'button');
-		icon.setAttribute('tabindex', '0');
-		if (!icon.dataset.a11yEnhanced) {
-			icon.dataset.a11yEnhanced = 'true';
-			icon.addEventListener('keydown', function(e) {
-				if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); icon.click(); }
-			});
-		}
+		if (!icon.getAttribute('role')) icon.setAttribute('role', 'button');
+		if (!icon.getAttribute('tabindex')) icon.setAttribute('tabindex', '0');
 	},
+	// Legacy functions for backwards compatibility
+	enhanceAchievementIcons: function() { this.labelAllStatsCrates(); },
+	enhanceUpgradeIcons: function() { this.labelAllStatsCrates(); },
+	labelAchievementIcon: function(i, a) { this.labelStatsAchievementIcon(i, a, false); },
+	labelUpgradeIcon: function(i, u) { this.labelStatsUpgradeIcon(i, u, false); },
 	setupNewsTicker: function() {
 		// News ticker disabled - too noisy for screen readers
 		// Users can manually navigate to read if needed
@@ -1823,13 +1840,59 @@ Game.registerMod("nvda accessibility", {
 	},
 	populateUpgradeLabel: function(u) {
 		if (!u) return;
+		var MOD = this;
 		var a = l('ariaReader-upgrade-' + u.id);
 		if (a) {
-			var n = u.dname || u.name, p = Beautify(Math.round(u.getPrice())), s = u.bought ? 'Purchased' : (u.canBuy() ? 'Affordable' : 'Too expensive');
+			var n = u.dname || u.name;
+			var p = Beautify(Math.round(u.getPrice()));
+			var s = u.bought ? 'Purchased' : (u.canBuy() ? 'Affordable' : 'Too expensive');
 			var t = n + '. ' + s + '. ';
-			if (!u.bought) t += 'Price: ' + p + '. ';
-			if (u.desc) t += this.stripHtml(u.desc);
+			if (!u.bought) {
+				t += 'Price: ' + p + '. ';
+				// Add time until affordable if not already affordable
+				if (!u.canBuy()) {
+					t += 'Time until affordable: ' + MOD.getTimeUntilAfford(u.getPrice()) + '. ';
+				}
+			}
+			if (u.desc) t += MOD.stripHtml(u.desc);
 			a.innerHTML = t;
+		}
+		// Also add a visible text element below the upgrade for screen readers
+		MOD.ensureUpgradeInfoText(u);
+	},
+	ensureUpgradeInfoText: function(u) {
+		var MOD = this;
+		if (!u || u.bought) return;
+		// Find the upgrade crate element
+		var crate = document.querySelector('.crate.upgrade[data-id="' + u.id + '"], button.crate.upgrade[data-id="' + u.id + '"]');
+		if (!crate) return;
+		// Check if info text already exists
+		var textId = 'a11y-upgrade-info-' + u.id;
+		var existingText = l(textId);
+		// Build the info text
+		var price = Beautify(Math.round(u.getPrice()));
+		var canBuy = u.canBuy();
+		var infoText = 'Cost: ' + price;
+		if (!canBuy) {
+			infoText += '. Time until affordable: ' + MOD.getTimeUntilAfford(u.getPrice());
+		}
+		infoText += '. ' + MOD.stripHtml(u.desc || '');
+		if (existingText) {
+			existingText.textContent = infoText;
+		} else {
+			// Create info text element (similar to Grimoire effect text)
+			var infoDiv = document.createElement('div');
+			infoDiv.id = textId;
+			infoDiv.style.cssText = 'display:block;padding:4px;margin:2px 0;font-size:11px;color:#ccc;background:#222;';
+			infoDiv.setAttribute('tabindex', '0');
+			infoDiv.setAttribute('aria-label', infoText);
+			infoDiv.textContent = infoText;
+			// Insert after the crate
+			if (crate.nextSibling) {
+				crate.parentNode.insertBefore(infoDiv, crate.nextSibling);
+			} else {
+				crate.parentNode.appendChild(infoDiv);
+			}
 		}
 	},
 	labelUpgradeCrate: function(c, u, v) {
@@ -1846,10 +1909,6 @@ Game.registerMod("nvda accessibility", {
 		if (!c.dataset.a11yEnhanced) {
 			c.dataset.a11yEnhanced = 'true';
 			c.addEventListener('keydown', function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); c.click(); } });
-		}
-		// Add info button with full details (not for vaulted or purchased)
-		if (!v && !u.bought) {
-			MOD.ensureUpgradeInfoButton(u, c);
 		}
 	},
 	enhanceAscensionUI: function() {
@@ -2442,40 +2501,70 @@ Game.registerMod("nvda accessibility", {
 		var overlay = document.createElement('div');
 		overlay.id = 'a11yShimmerOverlay';
 		overlay.setAttribute('role', 'region');
-		overlay.setAttribute('aria-label', 'Special Cookies');
-		// Note: No aria-live here - announcements are handled by trackShimmerAnnouncements
-		overlay.style.cssText = 'position:fixed;top:10px;left:10px;background:#000;border:2px solid #fc0;padding:10px;z-index:99999;display:none;';
-		document.body.appendChild(overlay);
+		overlay.setAttribute('aria-labelledby', 'a11yShimmerHeading');
+		// Position after the cookie area, more visible
+		overlay.style.cssText = 'background:#1a1a0a;border:2px solid #fc0;padding:10px;margin:10px 0;';
+		// Create heading
+		var heading = document.createElement('h2');
+		heading.id = 'a11yShimmerHeading';
+		heading.textContent = 'Golden Cookies & Shimmers';
+		heading.style.cssText = 'color:#fc0;margin:0 0 10px 0;font-size:16px;';
+		overlay.appendChild(heading);
+		// Create container for shimmer buttons
+		var container = document.createElement('div');
+		container.id = 'a11yShimmerButtons';
+		container.style.cssText = 'min-height:30px;';
+		container.innerHTML = '<div style="color:#888;font-style:italic;" tabindex="0">No active shimmers</div>';
+		overlay.appendChild(container);
+		// Insert after the products section (buildings)
+		var products = l('products');
+		if (products && products.parentNode) {
+			products.parentNode.insertBefore(overlay, products.nextSibling);
+		} else {
+			document.body.appendChild(overlay);
+		}
 	},
 	updateShimmerOverlay: function() {
 		var MOD = this;
-		var overlay = l('a11yShimmerOverlay');
-		if (!overlay) return;
+		var container = l('a11yShimmerButtons');
+		if (!container) {
+			// Recreate overlay if missing
+			MOD.createShimmerOverlay();
+			container = l('a11yShimmerButtons');
+			if (!container) return;
+		}
 		if (!Game.shimmers || Game.shimmers.length === 0) {
-			overlay.style.display = 'none';
+			container.innerHTML = '<div style="color:#888;font-style:italic;" tabindex="0">No active shimmers</div>';
 			return;
 		}
-		var html = '<h3 style="color:#fc0;margin:0 0 5px 0;">Active Shimmers:</h3>';
+		var html = '';
 		Game.shimmers.forEach(function(shimmer, idx) {
 			var variant = MOD.getShimmerVariantName(shimmer);
 			// Show remaining time if available
 			var timeLeft = '';
-			if (shimmer.life !== undefined && shimmer.dur !== undefined) {
+			if (shimmer.life !== undefined) {
 				var secondsLeft = Math.ceil(shimmer.life / Game.fps);
-				timeLeft = ' (' + secondsLeft + 's)';
+				timeLeft = ' (' + secondsLeft + 's remaining)';
 			}
-			html += '<button type="button" id="a11yShimmer' + idx + '" style="display:block;width:100%;padding:8px;margin:2px 0;background:#333;border:1px solid #fc0;color:#fff;cursor:pointer;">';
+			html += '<button type="button" id="a11yShimmer' + idx + '" ';
+			html += 'aria-label="' + variant + timeLeft + '. Click or press Enter to collect." ';
+			html += 'style="display:block;width:100%;padding:10px;margin:4px 0;background:#333;border:2px solid #fc0;color:#fff;cursor:pointer;font-size:14px;">';
 			html += variant + timeLeft + ' - Click to collect';
 			html += '</button>';
 		});
-		overlay.innerHTML = html;
-		overlay.style.display = 'block';
+		container.innerHTML = html;
 		// Add click handlers
 		Game.shimmers.forEach(function(shimmer, idx) {
 			var btn = l('a11yShimmer' + idx);
 			if (btn) {
 				btn.addEventListener('click', function() {
 					shimmer.pop();
+				});
+				btn.addEventListener('keydown', function(e) {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						shimmer.pop();
+					}
 				});
 			}
 		});
