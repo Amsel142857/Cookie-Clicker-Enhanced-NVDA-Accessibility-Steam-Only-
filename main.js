@@ -2261,9 +2261,10 @@ Game.registerMod("nvda accessibility", {
 				}
 			}
 			if (MOD.pantheonReady()) {
-				if (!l('a11yPantheonPanel')) {
-					MOD.createEnhancedPantheonPanel();
-				}
+				// Always call this - it will handle open/close state internally
+				MOD.createEnhancedPantheonPanel();
+				// Also enhance the original Pantheon elements
+				MOD.enhancePantheonMinigame();
 			}
 			if (Game.Objects['Wizard tower'] && Game.Objects['Wizard tower'].minigame) MOD.enhanceGrimoireMinigame();
 			if (Game.Objects['Bank'] && Game.Objects['Bank'].minigame) MOD.enhanceStockMarketMinigame();
@@ -2738,21 +2739,31 @@ Game.registerMod("nvda accessibility", {
 	createEnhancedPantheonPanel: function() {
 		var MOD = this;
 		if (!MOD.pantheonReady()) return;
-		var pan = Game.Objects['Temple'].minigame;
+		var temple = Game.Objects['Temple'];
+		var pan = temple.minigame;
+
+		// Only show panel when minigame is actually open
+		if (!temple.onMinigame) {
+			// Remove panel if minigame is closed
+			var oldPanel = l('a11yPantheonPanel');
+			if (oldPanel) oldPanel.remove();
+			return;
+		}
+
 		var oldPanel = l('a11yPantheonPanel');
 		if (oldPanel) oldPanel.remove();
-		// Find Pantheon container - try multiple locations
+
+		// Find Pantheon container - the minigame content area
 		var panContainer = l('row6minigame');
 		if (!panContainer || panContainer.style.display === 'none') {
-			// Try alternative locations
-			panContainer = l('templeContent') || document.querySelector('.templeGod');
+			// Try the Temple's minigame content
+			panContainer = document.querySelector('#row6minigame .templeContent') ||
+			               l('templeContent') ||
+			               document.querySelector('.templeGod');
 		}
-		// If still not found, try the Temple building element
+		// If still not found, use the minigame row itself
 		if (!panContainer) {
-			var temple = Game.Objects['Temple'];
-			if (temple && temple.l) {
-				panContainer = temple.l;
-			}
+			panContainer = l('row6');
 		}
 		if (!panContainer) {
 			console.log('[A11y] Pantheon: Could not find container for accessible panel');
@@ -2762,13 +2773,15 @@ Game.registerMod("nvda accessibility", {
 		var panel = document.createElement('div');
 		panel.id = 'a11yPantheonPanel';
 		panel.setAttribute('role', 'region');
-		panel.setAttribute('aria-label', 'Pantheon Accessible Controls');
+		panel.setAttribute('aria-labelledby', 'a11yPantheonHeading');
 		panel.style.cssText = 'background:#1a1a2e;border:2px solid #66a;padding:10px;margin:10px 0;';
 
-		// Heading with swap count
-		var heading = document.createElement('h3');
+		// H2 Heading for easy navigation with NVDA
+		var heading = document.createElement('h2');
+		heading.id = 'a11yPantheonHeading';
 		heading.textContent = 'Pantheon - ' + pan.swaps + ' Worship Swap' + (pan.swaps !== 1 ? 's' : '') + ' available';
-		heading.style.cssText = 'color:#aaf;margin:0 0 10px 0;font-size:14px;';
+		heading.style.cssText = 'color:#aaf;margin:0 0 10px 0;font-size:16px;';
+		heading.setAttribute('tabindex', '0');
 		panel.appendChild(heading);
 
 		// Selection status
@@ -2811,6 +2824,9 @@ Game.registerMod("nvda accessibility", {
 				placeBtn.disabled = !MOD.pantheonSelectedSpirit;
 				placeBtn.style.opacity = MOD.pantheonSelectedSpirit ? '1' : '0.5';
 				placeBtn.addEventListener('click', function() { MOD.placeSpiritInSlot(slotIndex); });
+				placeBtn.addEventListener('keydown', function(e) {
+					if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); MOD.placeSpiritInSlot(slotIndex); }
+				});
 				btnContainer.appendChild(placeBtn);
 
 				// Remove button
@@ -2821,6 +2837,9 @@ Game.registerMod("nvda accessibility", {
 					removeBtn.setAttribute('aria-label', 'Remove ' + currentSpirit.name + ' from ' + MOD.pantheonSlotNames[slotIndex] + ' slot');
 					removeBtn.style.cssText = 'padding:5px 10px;background:#633;border:1px solid #a66;color:#fff;cursor:pointer;';
 					removeBtn.addEventListener('click', function() { MOD.removeSpiritFromSlot(slotIndex); });
+					removeBtn.addEventListener('keydown', function(e) {
+						if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); MOD.removeSpiritFromSlot(slotIndex); }
+					});
 					btnContainer.appendChild(removeBtn);
 				}
 
@@ -2853,6 +2872,9 @@ Game.registerMod("nvda accessibility", {
 				spiritBtn.setAttribute('aria-label', s.name + (slottedIn >= 0 ? ', in ' + MOD.pantheonSlotNames[slottedIn] + ' slot' : '') + '. ' + desc);
 				spiritBtn.style.cssText = 'display:block;width:100%;padding:8px;margin:2px 0;background:' + (isSelected ? '#336' : '#333') + ';border:1px solid ' + (isSelected ? '#66a' : '#555') + ';color:#fff;cursor:pointer;text-align:left;';
 				spiritBtn.addEventListener('click', function() { MOD.selectPantheonSpirit(s); });
+				spiritBtn.addEventListener('keydown', function(e) {
+					if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); MOD.selectPantheonSpirit(s); }
+				});
 				panel.appendChild(spiritBtn);
 			})(spirit);
 		}
@@ -2861,8 +2883,12 @@ Game.registerMod("nvda accessibility", {
 		var clearBtn = document.createElement('button');
 		clearBtn.type = 'button';
 		clearBtn.textContent = 'Clear Selection';
+		clearBtn.setAttribute('aria-label', 'Clear spirit selection');
 		clearBtn.style.cssText = 'padding:8px 15px;background:#444;border:1px solid #666;color:#fff;cursor:pointer;margin:10px 0;';
 		clearBtn.addEventListener('click', function() { MOD.selectPantheonSpirit(null); });
+		clearBtn.addEventListener('keydown', function(e) {
+			if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); MOD.selectPantheonSpirit(null); }
+		});
 		panel.appendChild(clearBtn);
 
 		// Effects summary
@@ -2872,7 +2898,14 @@ Game.registerMod("nvda accessibility", {
 		effectsDiv.textContent = 'Active: ' + MOD.getPantheonEffectsSummary();
 		panel.appendChild(effectsDiv);
 
-		panContainer.parentNode.insertBefore(panel, panContainer.nextSibling);
+		// Insert panel - append to the minigame container so it appears inside
+		if (panContainer.id === 'row6minigame' || panContainer.id === 'row6') {
+			panContainer.appendChild(panel);
+		} else if (panContainer.parentNode) {
+			panContainer.parentNode.insertBefore(panel, panContainer.nextSibling);
+		} else {
+			panContainer.appendChild(panel);
+		}
 	},
 
 	// ============================================
