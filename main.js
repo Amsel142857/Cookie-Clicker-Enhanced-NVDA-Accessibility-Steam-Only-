@@ -1052,20 +1052,9 @@ Game.registerMod("nvda accessibility", {
 		}
 	},
 	gardenReady: function() {
-		// Check if garden is fully initialized and safe to access
-		try {
-			var farm = Game.Objects['Farm'];
-			if (!farm) return false;
-			if (!farm.minigame) return false;
-			// Note: farm.minigame.freeze is the freeze feature, NOT initialization status
-			if (!farm.minigame.plot) return false;
-			if (!farm.minigame.plantsById) return false;
-			// Check if plot is actually populated (not just empty array)
-			if (!farm.minigame.plot.length || farm.minigame.plot.length < 1) return false;
-			return true;
-		} catch(e) {
-			return false;
-		}
+		// DISABLED: Garden mini-game support is currently bugged and freezes the game
+		// Returning false to prevent any Garden code from running
+		return false;
 	},
 	enhanceGardenMinigame: function() {
 		var MOD = this;

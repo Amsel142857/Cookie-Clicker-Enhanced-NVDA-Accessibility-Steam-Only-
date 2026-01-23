@@ -19,11 +19,16 @@ Updated the Grimoire to show the names of the spells, alongside the cost, and ga
 Tentatively got the mini-game area, and sugar-lump-spending area to show things correctly (might need sighted confirmation), to be labelled.
 Added support to the Sugar Lump timer.
 Added support to the Stock Market... maybe.
-Added support for the Garden, and Pantheon mini-games.
+Added support for the Pantheon mini-game.
 Made drag-and-drop mechanics accessible. (So you can place your permanent upgrades, get the most of your dragon, and get help from Santa.)
 Added a little "Cookies per click" area right below the Big Cookie button, so you don't have to go hunting for it in the Statistics menu.
 Added a live announcement for the shimmers, announcing whether it is a Wrath or Golden Cookie, if a Reindeer appears, and so on.
 Made an H2 heading after the buildings to see your active buffs, and wrinklers.
+
+## Known Issues
+
+- **Garden mini-game**: Currently bugged with the mod and will freeze the game. Avoid opening the Garden until this is fixed.
+- **Statistics menu**: Goals for enhanced statistics menu accessibility have been abandoned.
 
 This is still undergoing tests, so please, feedback will be greatly appreciated. As will assistance.
 
