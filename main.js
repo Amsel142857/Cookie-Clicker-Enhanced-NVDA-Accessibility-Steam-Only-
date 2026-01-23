@@ -2616,104 +2616,195 @@ Game.registerMod("nvda accessibility", {
 	// ============================================
 	// MODULE: Enhanced Pantheon
 	// ============================================
+	// Pantheon state machine variables
+	pantheonSelectedSpirit: null,
+	pantheonSlotNames: ['Diamond', 'Ruby', 'Jade'],
+	pantheonSlotColors: ['#9cf', '#f99', '#9f9'],
+
+	selectPantheonSpirit: function(spirit) {
+		var MOD = this;
+		if (!spirit) {
+			MOD.pantheonSelectedSpirit = null;
+			MOD.announce('Spirit selection cleared');
+		} else {
+			MOD.pantheonSelectedSpirit = spirit;
+			MOD.announce(spirit.name + ' selected. Choose a slot: Diamond, Ruby, or Jade');
+		}
+		MOD.createEnhancedPantheonPanel();
+	},
+
+	placeSpiritInSlot: function(slotIndex) {
+		var MOD = this;
+		var pan = Game.Objects['Temple'].minigame;
+		if (!pan) return;
+		if (pan.swaps <= 0) {
+			MOD.announce('No worship swaps available');
+			return;
+		}
+		if (!MOD.pantheonSelectedSpirit) {
+			MOD.announce('Select a spirit first, then choose a slot');
+			return;
+		}
+		pan.slotGod(pan.gods[MOD.pantheonSelectedSpirit.id], slotIndex);
+		MOD.announce(MOD.pantheonSelectedSpirit.name + ' placed in ' + MOD.pantheonSlotNames[slotIndex] + ' slot');
+		MOD.pantheonSelectedSpirit = null;
+		MOD.createEnhancedPantheonPanel();
+	},
+
+	removeSpiritFromSlot: function(slotIndex) {
+		var MOD = this;
+		var pan = Game.Objects['Temple'].minigame;
+		if (!pan) return;
+		var spiritId = pan.slot[slotIndex];
+		if (spiritId === -1) {
+			MOD.announce(MOD.pantheonSlotNames[slotIndex] + ' slot is already empty');
+			return;
+		}
+		var spirit = pan.gods[spiritId];
+		pan.slotGod(spirit, -1);
+		MOD.announce((spirit ? spirit.name : 'Spirit') + ' removed from ' + MOD.pantheonSlotNames[slotIndex] + ' slot');
+		MOD.createEnhancedPantheonPanel();
+	},
+
+	getPantheonEffectsSummary: function() {
+		var MOD = this;
+		var pan = Game.Objects['Temple'].minigame;
+		if (!pan) return 'Pantheon not available';
+		var effects = [];
+		for (var i = 0; i < 3; i++) {
+			var spiritId = pan.slot[i];
+			if (spiritId === -1) continue;
+			var spirit = pan.gods[spiritId];
+			if (!spirit) continue;
+			var desc = spirit['desc' + (i + 1)] || spirit.desc1 || '';
+			desc = MOD.stripHtml(desc);
+			effects.push(MOD.pantheonSlotNames[i] + ': ' + spirit.name + ' - ' + desc);
+		}
+		return effects.length > 0 ? effects.join(' | ') : 'No spirits currently slotted';
+	},
+
 	createEnhancedPantheonPanel: function() {
 		var MOD = this;
 		if (!MOD.pantheonReady()) return;
 		var pan = Game.Objects['Temple'].minigame;
 		var oldPanel = l('a11yPantheonPanel');
 		if (oldPanel) oldPanel.remove();
-		// Find pantheon container
 		var panContainer = l('row6minigame');
 		if (!panContainer || panContainer.style.display === 'none') return;
+
 		var panel = document.createElement('div');
 		panel.id = 'a11yPantheonPanel';
 		panel.setAttribute('role', 'region');
-		panel.setAttribute('aria-label', 'Pantheon Controls');
-		panel.style.cssText = 'background:#1a1a2e;border:2px solid #a6a;padding:10px;margin:10px 0;';
-		// Title with worship swaps
-		var swaps = pan.swaps || 0;
+		panel.setAttribute('aria-label', 'Pantheon Accessible Controls');
+		panel.style.cssText = 'background:#1a1a2e;border:2px solid #66a;padding:10px;margin:10px 0;';
+
+		// Heading with swap count
 		var heading = document.createElement('h3');
-		heading.textContent = 'Pantheon - ' + swaps + ' Worship Swap' + (swaps !== 1 ? 's' : '') + ' available';
-		heading.style.cssText = 'color:#a6f;margin:0 0 10px 0;font-size:14px;';
+		heading.textContent = 'Pantheon - ' + pan.swaps + ' Worship Swap' + (pan.swaps !== 1 ? 's' : '') + ' available';
+		heading.style.cssText = 'color:#aaf;margin:0 0 10px 0;font-size:14px;';
 		panel.appendChild(heading);
-		var slots = ['Diamond', 'Ruby', 'Jade'];
-		var slotMultipliers = [100, 50, 25]; // Effect percentages
-		// Create slot sections
+
+		// Selection status
+		var status = document.createElement('div');
+		status.setAttribute('role', 'status');
+		status.style.cssText = 'padding:8px;background:#252540;border:1px solid #66a;margin:10px 0;color:#ccf;';
+		status.textContent = MOD.pantheonSelectedSpirit ?
+			'Selected: ' + MOD.pantheonSelectedSpirit.name + '. Choose a slot below.' :
+			'Select a spirit from the list below';
+		panel.appendChild(status);
+
+		// SLOTS SECTION
+		var slotsHeading = document.createElement('h4');
+		slotsHeading.textContent = 'Worship Slots';
+		slotsHeading.style.cssText = 'color:#ccc;margin:15px 0 5px 0;font-size:13px;';
+		panel.appendChild(slotsHeading);
+
 		for (var i = 0; i < 3; i++) {
-			var slotDiv = document.createElement('div');
-			slotDiv.style.cssText = 'margin:10px 0;padding:10px;background:#222;border:1px solid #666;';
-			var slotHeading = document.createElement('h4');
-			slotHeading.style.cssText = 'color:#fc0;margin:0 0 5px 0;font-size:13px;';
-			var spiritId = pan.slot[i];
-			if (spiritId !== -1 && pan.gods[spiritId]) {
-				var god = pan.gods[spiritId];
-				slotHeading.textContent = slots[i] + ' Slot: ' + god.name;
-				// Show spirit effect
-				var effectDiv = document.createElement('div');
-				effectDiv.style.cssText = 'color:#ccc;font-size:12px;margin:5px 0;';
-				var descKey = 'desc' + (i + 1);
-				effectDiv.textContent = 'Effect (' + slotMultipliers[i] + '%): ' + MOD.stripHtml(god[descKey] || god.desc1 || '');
-				slotDiv.appendChild(slotHeading);
-				slotDiv.appendChild(effectDiv);
-				// Clear button
-				var clearBtn = document.createElement('button');
-				clearBtn.type = 'button';
-				clearBtn.textContent = 'Remove ' + god.name;
-				clearBtn.style.cssText = 'padding:5px 10px;background:#633;border:1px solid #966;color:#fff;cursor:pointer;margin-top:5px;';
-				(function(slotIdx, godObj) {
-					clearBtn.addEventListener('click', function() {
-						pan.slotGod(godObj, -1);
-						MOD.announce(godObj.name + ' removed from ' + slots[slotIdx] + ' slot');
-						MOD.createEnhancedPantheonPanel();
-					});
-				})(i, god);
-				slotDiv.appendChild(clearBtn);
-			} else {
-				slotHeading.textContent = slots[i] + ' Slot: Empty';
-				slotDiv.appendChild(slotHeading);
-			}
-			panel.appendChild(slotDiv);
+			(function(slotIndex) {
+				var slotDiv = document.createElement('div');
+				slotDiv.style.cssText = 'margin:5px 0;padding:10px;background:#222;border:2px solid ' + MOD.pantheonSlotColors[slotIndex] + ';';
+
+				var currentSpiritId = pan.slot[slotIndex];
+				var currentSpirit = currentSpiritId !== -1 ? pan.gods[currentSpiritId] : null;
+
+				var slotLabel = document.createElement('div');
+				slotLabel.style.cssText = 'color:' + MOD.pantheonSlotColors[slotIndex] + ';font-weight:bold;';
+				slotLabel.textContent = MOD.pantheonSlotNames[slotIndex] + ' Slot: ' + (currentSpirit ? currentSpirit.name : 'Empty');
+				slotDiv.appendChild(slotLabel);
+
+				var btnContainer = document.createElement('div');
+				btnContainer.style.marginTop = '5px';
+
+				// Place button
+				var placeBtn = document.createElement('button');
+				placeBtn.type = 'button';
+				placeBtn.textContent = 'Place Here';
+				placeBtn.setAttribute('aria-label', 'Place ' + (MOD.pantheonSelectedSpirit ? MOD.pantheonSelectedSpirit.name : 'selected spirit') + ' in ' + MOD.pantheonSlotNames[slotIndex] + ' slot');
+				placeBtn.style.cssText = 'padding:5px 10px;background:#336;border:1px solid #66a;color:#fff;cursor:pointer;margin-right:5px;';
+				placeBtn.disabled = !MOD.pantheonSelectedSpirit;
+				placeBtn.style.opacity = MOD.pantheonSelectedSpirit ? '1' : '0.5';
+				placeBtn.addEventListener('click', function() { MOD.placeSpiritInSlot(slotIndex); });
+				btnContainer.appendChild(placeBtn);
+
+				// Remove button
+				if (currentSpirit) {
+					var removeBtn = document.createElement('button');
+					removeBtn.type = 'button';
+					removeBtn.textContent = 'Remove';
+					removeBtn.setAttribute('aria-label', 'Remove ' + currentSpirit.name + ' from ' + MOD.pantheonSlotNames[slotIndex] + ' slot');
+					removeBtn.style.cssText = 'padding:5px 10px;background:#633;border:1px solid #a66;color:#fff;cursor:pointer;';
+					removeBtn.addEventListener('click', function() { MOD.removeSpiritFromSlot(slotIndex); });
+					btnContainer.appendChild(removeBtn);
+				}
+
+				slotDiv.appendChild(btnContainer);
+				panel.appendChild(slotDiv);
+			})(i);
 		}
-		// Spirit selection section
-		var spiritHeading = document.createElement('h4');
-		spiritHeading.textContent = 'Available Spirits:';
-		spiritHeading.style.cssText = 'color:#fc0;margin:15px 0 10px 0;font-size:13px;';
-		panel.appendChild(spiritHeading);
+
+		// SPIRITS SECTION
+		var spiritsHeading = document.createElement('h4');
+		spiritsHeading.textContent = 'Available Spirits (click to select)';
+		spiritsHeading.style.cssText = 'color:#ccc;margin:15px 0 5px 0;font-size:13px;';
+		panel.appendChild(spiritsHeading);
+
 		for (var id in pan.gods) {
-			var god = pan.gods[id];
-			var inSlot = pan.slot.indexOf(parseInt(id));
-			if (inSlot >= 0) continue; // Skip if already slotted
-			var spiritDiv = document.createElement('div');
-			spiritDiv.style.cssText = 'margin:5px 0;padding:8px;background:#333;border:1px solid #555;';
-			var spiritName = document.createElement('strong');
-			spiritName.textContent = god.name;
-			spiritName.style.color = '#fff';
-			spiritDiv.appendChild(spiritName);
-			var spiritDesc = document.createElement('div');
-			spiritDesc.textContent = MOD.stripHtml(god.desc1 || '');
-			spiritDesc.style.cssText = 'color:#aaa;font-size:11px;margin:3px 0;';
-			spiritDiv.appendChild(spiritDesc);
-			// Slot buttons
-			var btnContainer = document.createElement('div');
-			btnContainer.style.marginTop = '5px';
-			for (var s = 0; s < 3; s++) {
-				(function(slotIdx, godObj) {
-					var slotBtn = document.createElement('button');
-					slotBtn.type = 'button';
-					slotBtn.textContent = slots[slotIdx].charAt(0);
-					slotBtn.setAttribute('aria-label', 'Place ' + godObj.name + ' in ' + slots[slotIdx] + ' slot');
-					slotBtn.style.cssText = 'padding:5px 10px;margin:2px;background:#363;border:1px solid #6a6;color:#fff;cursor:pointer;';
-					slotBtn.addEventListener('click', function() {
-						pan.slotGod(godObj, slotIdx);
-						MOD.announce(godObj.name + ' placed in ' + slots[slotIdx] + ' slot');
-						MOD.createEnhancedPantheonPanel();
-					});
-					btnContainer.appendChild(slotBtn);
-				})(s, god);
-			}
-			spiritDiv.appendChild(btnContainer);
-			panel.appendChild(spiritDiv);
+			var spirit = pan.gods[id];
+			if (!spirit) continue;
+			(function(s) {
+				var slottedIn = pan.slot.indexOf(parseInt(s.id));
+				var isSelected = MOD.pantheonSelectedSpirit && MOD.pantheonSelectedSpirit.id === s.id;
+
+				var spiritBtn = document.createElement('button');
+				spiritBtn.type = 'button';
+				var btnText = s.name;
+				if (slottedIn >= 0) btnText += ' (in ' + MOD.pantheonSlotNames[slottedIn] + ')';
+				if (isSelected) btnText += ' [SELECTED]';
+				spiritBtn.textContent = btnText;
+
+				var desc = MOD.stripHtml(s.desc1 || '');
+				spiritBtn.setAttribute('aria-label', s.name + (slottedIn >= 0 ? ', in ' + MOD.pantheonSlotNames[slottedIn] + ' slot' : '') + '. ' + desc);
+				spiritBtn.style.cssText = 'display:block;width:100%;padding:8px;margin:2px 0;background:' + (isSelected ? '#336' : '#333') + ';border:1px solid ' + (isSelected ? '#66a' : '#555') + ';color:#fff;cursor:pointer;text-align:left;';
+				spiritBtn.addEventListener('click', function() { MOD.selectPantheonSpirit(s); });
+				panel.appendChild(spiritBtn);
+			})(spirit);
 		}
+
+		// Clear selection button
+		var clearBtn = document.createElement('button');
+		clearBtn.type = 'button';
+		clearBtn.textContent = 'Clear Selection';
+		clearBtn.style.cssText = 'padding:8px 15px;background:#444;border:1px solid #666;color:#fff;cursor:pointer;margin:10px 0;';
+		clearBtn.addEventListener('click', function() { MOD.selectPantheonSpirit(null); });
+		panel.appendChild(clearBtn);
+
+		// Effects summary
+		var effectsDiv = document.createElement('div');
+		effectsDiv.setAttribute('tabindex', '0');
+		effectsDiv.style.cssText = 'padding:10px;background:#222;border:1px solid #444;color:#aaa;font-size:12px;margin-top:10px;';
+		effectsDiv.textContent = 'Active: ' + MOD.getPantheonEffectsSummary();
+		panel.appendChild(effectsDiv);
+
 		panContainer.parentNode.insertBefore(panel, panContainer.nextSibling);
 	},
 
