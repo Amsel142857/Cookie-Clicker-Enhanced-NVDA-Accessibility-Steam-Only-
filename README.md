@@ -22,7 +22,7 @@ Added support to the Stock Market... maybe.
 Added support for the Pantheon mini-game.
 Made drag-and-drop mechanics accessible. (So you can place your permanent upgrades, get the most of your dragon, and get help from Santa.)
 Added a little "Cookies per click" area right below the Big Cookie button, so you don't have to go hunting for it in the Statistics menu.
-Added a live announcement for the shimmers, announcing whether it is a Wrath or Golden Cookie, if a Reindeer appears, and so on.
+Added live announcements for shimmers - you'll hear when a Golden Cookie, Wrath Cookie, or Reindeer appears, and when it's about to fade away. Click them manually in the game as you normally would.
 Made an H2 heading after the buildings to see your active buffs, and wrinklers.
 
 ## Known Issues
