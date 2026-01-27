@@ -69,8 +69,8 @@ Game.registerMod("nvda accessibility", {
 				MOD.labelStatsUpgradesAndAchievements();
 			}, 100);
 		});
-		Game.Notify('Accessibility Enhanced', 'Version 8 - Shimmer buttons removed.', [10, 0], 6);
-		this.announce('NVDA Accessibility mod version 8 loaded. Shimmer buttons removed. You will hear announcements when shimmers appear and fade.');
+		Game.Notify('Accessibility Enhanced', 'Version 10 - Garden minigame with button navigation.', [10, 0], 6);
+		this.announce('NVDA Accessibility mod version 10 loaded. Garden minigame now uses button-based navigation.');
 	},
 	overrideDrawBuildings: function() {
 		var MOD = this;
@@ -1092,8 +1092,8 @@ Game.registerMod("nvda accessibility", {
 		if (!g) return;
 
 		// Label garden tiles - they use ID format: gardenTile-{x}-{y}
-		for (var y = 0; y < g.plotHeight; y++) {
-			for (var x = 0; x < g.plotWidth; x++) {
+		for (var y = 0; y < 6; y++) {
+			for (var x = 0; x < 6; x++) {
 				var tile = l('gardenTile-' + x + '-' + y);
 				if (!tile) continue;
 				var t = g.plot[y] && g.plot[y][x];
@@ -1114,6 +1114,17 @@ Game.registerMod("nvda accessibility", {
 				tile.setAttribute('aria-label', lbl);
 				tile.setAttribute('role', 'button');
 				tile.setAttribute('tabindex', '0');
+				if (!tile.getAttribute('data-a11y-kb')) {
+					tile.setAttribute('data-a11y-kb', '1');
+					(function(el) {
+						el.addEventListener('keydown', function(e) {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								el.click();
+							}
+						});
+					})(tile);
+				}
 			}
 		}
 
@@ -1133,6 +1144,17 @@ Game.registerMod("nvda accessibility", {
 			seed.setAttribute('aria-label', lbl);
 			seed.setAttribute('role', 'button');
 			seed.setAttribute('tabindex', '0');
+			if (!seed.getAttribute('data-a11y-kb')) {
+				seed.setAttribute('data-a11y-kb', '1');
+				(function(el) {
+					el.addEventListener('keydown', function(e) {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							el.click();
+						}
+					});
+				})(seed);
+			}
 		}
 
 		// Label garden tools - they use ID format: gardenTool-{id}
@@ -1158,6 +1180,17 @@ Game.registerMod("nvda accessibility", {
 				toolEl.setAttribute('aria-label', lbl);
 				toolEl.setAttribute('role', 'button');
 				toolEl.setAttribute('tabindex', '0');
+				if (!toolEl.getAttribute('data-a11y-kb')) {
+					toolEl.setAttribute('data-a11y-kb', '1');
+					(function(el) {
+						el.addEventListener('keydown', function(e) {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								el.click();
+							}
+						});
+					})(toolEl);
+				}
 			}
 		}
 		// Also try to find tools by numeric ID (0, 1, 2, 3)
@@ -1173,6 +1206,17 @@ Game.registerMod("nvda accessibility", {
 				toolEl.setAttribute('aria-label', labels[i] || 'Garden tool ' + i);
 				toolEl.setAttribute('role', 'button');
 				toolEl.setAttribute('tabindex', '0');
+				if (!toolEl.getAttribute('data-a11y-kb')) {
+					toolEl.setAttribute('data-a11y-kb', '1');
+					(function(el) {
+						el.addEventListener('keydown', function(e) {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								el.click();
+							}
+						});
+					})(toolEl);
+				}
 			}
 		}
 
@@ -1193,6 +1237,17 @@ Game.registerMod("nvda accessibility", {
 			soilEl.setAttribute('aria-label', lbl);
 			soilEl.setAttribute('role', 'button');
 			soilEl.setAttribute('tabindex', '0');
+			if (!soilEl.getAttribute('data-a11y-kb')) {
+				soilEl.setAttribute('data-a11y-kb', '1');
+				(function(el) {
+					el.addEventListener('keydown', function(e) {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							el.click();
+						}
+					});
+				})(soilEl);
+			}
 		}
 	},
 	createGardenAccessiblePanel: function(g) {
@@ -1201,85 +1256,68 @@ Game.registerMod("nvda accessibility", {
 		// Remove old panel if exists
 		var oldPanel = l('a11yGardenPanel');
 		if (oldPanel) oldPanel.remove();
-		// Check if garden minigame is visible - look for the actual minigame div
+		// Check if garden minigame is visible
 		var gardenContainer = l('row2minigame');
 		if (!gardenContainer) {
-			// Try alternative - look for gardenContent
 			gardenContainer = l('gardenContent');
 		}
 		if (!gardenContainer) return;
+
+		// Gather statistics for announcement
+		var unlockedSeeds = MOD.getUnlockedSeeds(g);
+		var harvestable = MOD.getHarvestablePlants(g);
+		var plantsCount = 0;
+		for (var py = 0; py < 6; py++) {
+			for (var px = 0; px < 6; px++) {
+				var tile = g.plot[py] && g.plot[py][px];
+				if (tile && tile[0] > 0) plantsCount++;
+			}
+		}
+
 		// Create accessible panel
 		var panel = document.createElement('div');
 		panel.id = 'a11yGardenPanel';
 		panel.setAttribute('role', 'region');
 		panel.setAttribute('aria-labelledby', 'a11yGardenHeading');
 		panel.style.cssText = 'background:#1a2a1a;border:2px solid #4a4;padding:10px;margin:10px 0;';
+
 		// H2 Title for navigation
 		var title = document.createElement('h2');
 		title.id = 'a11yGardenHeading';
 		title.textContent = 'Garden - Level ' + (parseInt(g.parent.level) || 0);
 		title.style.cssText = 'color:#6c6;margin:0 0 10px 0;font-size:16px;';
 		panel.appendChild(title);
-		// Status info
+
+		// Status summary (focusable)
 		var statusDiv = document.createElement('div');
 		statusDiv.id = 'a11yGardenStatus';
-		statusDiv.style.cssText = 'color:#aaa;margin-bottom:10px;padding:5px;background:#222;';
-		var freezeStatus = g.freeze ? 'FROZEN (plants not growing)' : 'Active';
-		var soilName = g.soils && g.soil !== undefined && g.soils[g.soil] ? g.soils[g.soil].name : 'Unknown';
-		statusDiv.innerHTML = '<strong>Status:</strong> ' + freezeStatus + ' | <strong>Soil:</strong> ' + soilName;
 		statusDiv.setAttribute('tabindex', '0');
+		statusDiv.style.cssText = 'color:#aaa;margin-bottom:10px;padding:5px;background:#222;';
+		var freezeStatus = g.freeze ? 'FROZEN' : 'Active';
+		var soilName = g.soils && g.soil !== undefined && g.soils[g.soil] ? g.soils[g.soil].name : 'Unknown';
+		statusDiv.textContent = 'Status: ' + freezeStatus + ' | Soil: ' + soilName + ' | ' + plantsCount + ' plants, ' + harvestable.length + ' ready to harvest';
 		panel.appendChild(statusDiv);
 
-		// Instructions section
-		var instructDiv = document.createElement('div');
-		instructDiv.style.cssText = 'background:#222;padding:8px;margin:10px 0;border:1px solid #444;color:#aaa;font-size:12px;';
-		instructDiv.setAttribute('tabindex', '0');
-		instructDiv.innerHTML = '<strong>How to plant:</strong> 1) Select a seed below. 2) Click an empty plot to plant it. ' +
-			'<strong>How to harvest:</strong> Click a plot with a mature plant (100% grown), or use Harvest All button.';
-		panel.appendChild(instructDiv);
+		// Live region for announcements
+		var announcer = document.createElement('div');
+		announcer.id = 'a11yGardenAnnouncer';
+		announcer.setAttribute('role', 'status');
+		announcer.setAttribute('aria-live', 'polite');
+		announcer.setAttribute('aria-atomic', 'true');
+		announcer.style.cssText = 'position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;';
+		announcer.textContent = 'Garden panel loaded. ' + unlockedSeeds.length + ' seeds unlocked, ' + plantsCount + ' plots with plants, ' + harvestable.length + ' ready to harvest';
+		panel.appendChild(announcer);
 
-		// Tools section
-		var toolsHeading = document.createElement('h4');
-		toolsHeading.textContent = 'Tools:';
-		toolsHeading.style.cssText = 'color:#ccc;margin:10px 0 5px 0;font-size:12px;';
-		panel.appendChild(toolsHeading);
 		var toolsDiv = document.createElement('div');
 		toolsDiv.style.cssText = 'margin-bottom:10px;';
-		// Harvest All button
-		var harvestBtn = document.createElement('button');
-		harvestBtn.type = 'button';
-		harvestBtn.textContent = 'Harvest All';
-		harvestBtn.setAttribute('aria-label', 'Harvest All. Instantly harvest all mature plants in your garden');
-		harvestBtn.style.cssText = 'padding:8px 12px;margin:2px;background:#363;border:1px solid #4a4;color:#fff;cursor:pointer;';
-		harvestBtn.addEventListener('click', function() {
-			var harvestTool = l('gardenTool-1');
-			if (harvestTool) harvestTool.click();
-			MOD.announce('Harvested all mature plants');
-		});
-		toolsDiv.appendChild(harvestBtn);
-		// Freeze button
-		if (g.freeze !== undefined) {
-			var freezeBtn = document.createElement('button');
-			freezeBtn.type = 'button';
-			freezeBtn.textContent = g.freeze ? 'Unfreeze Garden' : 'Freeze Garden';
-			freezeBtn.setAttribute('aria-label', g.freeze ? 'Unfreeze Garden. Resume plant growth' : 'Freeze Garden. Pause all plant growth');
-			freezeBtn.style.cssText = 'padding:8px 12px;margin:2px;background:#336;border:1px solid #44a;color:#fff;cursor:pointer;';
-			freezeBtn.addEventListener('click', function() {
-				var freezeTool = l('gardenTool-2');
-				if (freezeTool) freezeTool.click();
-				MOD.announce(g.freeze ? 'Garden frozen' : 'Garden unfrozen');
-			});
-			toolsDiv.appendChild(freezeBtn);
-		}
-		panel.appendChild(toolsDiv);
-		// Soil selector section
+
+		// === Soil buttons ===
 		if (g.soils) {
-			var soilHeading = document.createElement('h4');
-			soilHeading.textContent = 'Soil Type:';
-			soilHeading.style.cssText = 'color:#ccc;margin:10px 0 5px 0;font-size:12px;';
-			panel.appendChild(soilHeading);
 			var soilDiv = document.createElement('div');
-			soilDiv.style.cssText = 'margin-bottom:10px;';
+			soilDiv.setAttribute('role', 'group');
+			soilDiv.setAttribute('aria-label', 'Soil types');
+			soilDiv.style.cssText = 'margin-top:6px;';
+
 			for (var soilId in g.soils) {
 				var soil = g.soils[soilId];
 				if (!soil) continue;
@@ -1296,159 +1334,226 @@ Game.registerMod("nvda accessibility", {
 					soilBtn.setAttribute('aria-label', s.name + (isActive ? ' (currently active)' : '') + '. ' + effectStr);
 					soilBtn.style.cssText = 'padding:6px 10px;margin:2px;background:' + (isActive ? '#353' : '#333') + ';border:1px solid ' + (isActive ? '#4a4' : '#555') + ';color:#fff;cursor:pointer;font-size:11px;';
 					soilBtn.addEventListener('click', function() {
-						g.soil = parseInt(sid);
-						MOD.announce(s.name + ' soil selected');
-						MOD.createGardenAccessiblePanel(g); // Refresh panel
+						var soilEl = l('gardenSoil-' + sid);
+						if (soilEl) soilEl.click();
+						MOD.gardenAnnounce('Changed to ' + s.name + ' soil. ' + effectStr);
+						setTimeout(function() { MOD.updateAllPlotButtons(); MOD.updateGardenPanelStatus(); }, 100);
 					});
 					soilDiv.appendChild(soilBtn);
 				})(soil, soilId);
 			}
-			panel.appendChild(soilDiv);
+			toolsDiv.appendChild(soilDiv);
 		}
-		// Seeds section
-		var currentSeed = g.seedSelected >= 0 && g.plantsById[g.seedSelected] ? g.plantsById[g.seedSelected].name : 'None';
-		var seedsHeading = document.createElement('h4');
-		seedsHeading.textContent = 'Seeds - Currently selected: ' + currentSeed;
-		seedsHeading.style.cssText = 'color:#ccc;margin:10px 0 5px 0;font-size:12px;';
-		seedsHeading.setAttribute('tabindex', '0');
-		panel.appendChild(seedsHeading);
-		var seedsDiv = document.createElement('div');
-		seedsDiv.style.cssText = 'margin-bottom:10px;max-height:150px;overflow-y:auto;';
-		for (var seedId in g.plantsById) {
-			var plant = g.plantsById[seedId];
-			if (!plant || !plant.unlocked) continue;
-			(function(p, id) {
-				var isSelected = (g.seedSelected == id);
-				var seedBtn = document.createElement('button');
-				seedBtn.type = 'button';
-				seedBtn.textContent = (isSelected ? '>> ' : '') + p.name + (isSelected ? ' (SELECTED)' : '');
-				var effectText = p.effsStr ? MOD.stripHtml(p.effsStr) : 'No special effects';
-				seedBtn.setAttribute('aria-label', (isSelected ? 'Currently selected: ' : 'Select seed: ') + p.name + '. ' + effectText + '. Click to select, then click a plot to plant.');
-				seedBtn.style.cssText = 'display:block;width:100%;padding:6px;margin:2px 0;background:' + (isSelected ? '#353' : '#333') + ';border:1px solid ' + (isSelected ? '#4a4' : '#555') + ';color:#fff;cursor:pointer;text-align:left;font-size:12px;';
-				seedBtn.addEventListener('click', function() {
-					var seedEl = l('gardenSeed-' + id);
-					if (seedEl) seedEl.click();
-					MOD.announce(p.name + ' seed selected. Now click a plot to plant it.');
-					// Refresh the panel to show updated selection
-					setTimeout(function() { MOD.createGardenAccessiblePanel(g); }, 100);
-				});
-				seedsDiv.appendChild(seedBtn);
-			})(plant, seedId);
-		}
-		panel.appendChild(seedsDiv);
-		// Plot grid section
-		var plotHeading = document.createElement('h4');
-		plotHeading.textContent = 'Garden Plots (' + g.plotWidth + 'x' + g.plotHeight + '):';
-		plotHeading.style.cssText = 'color:#ccc;margin:10px 0 5px 0;font-size:12px;';
-		panel.appendChild(plotHeading);
-		var plotDiv = document.createElement('div');
-		plotDiv.style.cssText = 'display:grid;grid-template-columns:repeat(' + g.plotWidth + ', 1fr);gap:2px;';
-		for (var y = 0; y < g.plotHeight; y++) {
-			for (var x = 0; x < g.plotWidth; x++) {
-				(function(px, py) {
-					var plotBtn = document.createElement('button');
-					plotBtn.type = 'button';
-					plotBtn.id = 'a11yGardenPlot-' + py + '-' + px;
-					plotBtn.style.cssText = 'padding:8px 4px;background:#222;border:1px solid #444;color:#fff;cursor:pointer;font-size:10px;min-height:40px;';
-					// Set label based on plot contents
-					var t = g.plot[py] && g.plot[py][px];
-					var lbl = 'Row ' + (py+1) + ', Column ' + (px+1) + ': ';
-					var isEmpty = true;
-					var isReady = false;
-					if (t && t[0] > 0) {
-						isEmpty = false;
-						var pl = g.plantsById[t[0] - 1];
-						if (pl) {
-							var mature = pl.mature || 100;
-							var pct = Math.floor((t[1] / mature) * 100);
-							lbl += pl.name + ', ' + pct + '% grown';
-							plotBtn.textContent = pl.name.substring(0, 3) + ' ' + pct + '%';
-							if (t[1] >= mature) {
-								isReady = true;
-								lbl += '. READY TO HARVEST - click to harvest';
-								plotBtn.style.background = '#353';
-							}
-						}
-					} else {
-						lbl += 'Empty';
-						if (g.seedSelected >= 0 && g.plantsById[g.seedSelected]) {
-							lbl += '. Click to plant ' + g.plantsById[g.seedSelected].name;
-						} else {
-							lbl += '. Select a seed first, then click here to plant';
-						}
-						plotBtn.textContent = '-';
-					}
-					plotBtn.setAttribute('aria-label', lbl);
-					plotBtn.addEventListener('click', function() {
-						// Click the actual tile using its ID
-						var actualTile = l('gardenTile-' + px + '-' + py);
-						if (actualTile) {
-							actualTile.click();
-							// Announce what happened
-							setTimeout(function() {
-								var newT = g.plot[py] && g.plot[py][px];
-								if (newT && newT[0] > 0) {
-									var newPl = g.plantsById[newT[0] - 1];
-									if (newPl) {
-										MOD.announce('Planted ' + newPl.name + ' at row ' + (py+1) + ', column ' + (px+1));
-									}
-								} else {
-									MOD.announce('Harvested plant from row ' + (py+1) + ', column ' + (px+1));
-								}
-								MOD.createGardenAccessiblePanel(g); // Refresh panel
-							}, 100);
-						}
-					});
-					plotDiv.appendChild(plotBtn);
-				})(x, y);
-			}
-		}
-		panel.appendChild(plotDiv);
+		panel.appendChild(toolsDiv);
+
 		// Insert panel after the garden minigame
 		gardenContainer.parentNode.insertBefore(panel, gardenContainer.nextSibling);
 	},
-	updateGardenPlotLabels: function() {
+	// Update a single plot button in-place (preserves focus)
+	updatePlotButton: function(x, y) {
+		var MOD = this;
+		var btn = l('a11yPlot-' + x + '-' + y);
+		if (!btn) return;
+		if (!MOD.gardenReady()) return;
+		var g = Game.Objects['Farm'].minigame;
+		var info = MOD.getGardenTileInfo(x, y);
+		var selectedSeedName = '';
+		if (g.seedSelected >= 0 && g.plantsById[g.seedSelected]) {
+			selectedSeedName = g.plantsById[g.seedSelected].name;
+		}
+		var label = 'Plot ' + (x+1) + ',' + (y+1) + ': ';
+		if (info.isEmpty) {
+			if (selectedSeedName) {
+				label += 'Empty. Press Enter to plant ' + selectedSeedName;
+				btn.style.background = '#2a3a2a';
+				btn.style.border = '1px solid #4a4';
+				btn.style.color = '#afa';
+			} else {
+				label += 'Empty. Select a seed first to plant';
+				btn.style.background = '#333';
+				btn.style.border = '1px solid #555';
+				btn.style.color = '#fff';
+			}
+		} else if (info.isMature) {
+			label += info.name + ', READY. Press Enter to harvest';
+			btn.style.background = '#3a3a2a';
+			btn.style.border = '1px solid #aa4';
+			btn.style.color = '#ffa';
+		} else {
+			label += info.name + ', ' + info.growth + '% grown';
+			btn.style.background = '#2a2a3a';
+			btn.style.border = '1px solid #55a';
+			btn.style.color = '#aaf';
+		}
+		btn.textContent = label;
+		btn.setAttribute('aria-label', label);
+	},
+	// Update all plot buttons in-place
+	updateAllPlotButtons: function() {
 		var MOD = this;
 		if (!MOD.gardenReady()) return;
 		var g = Game.Objects['Farm'].minigame;
+		for (var y = 0; y < 6; y++) {
+			for (var x = 0; x < 6; x++) {
+				MOD.updatePlotButton(x, y);
+			}
+		}
+	},
+	// Get tile information at coordinates
+	getGardenTileInfo: function(x, y) {
+		var MOD = this;
+		if (!MOD.gardenReady()) return { isEmpty: true, name: 'Empty', growth: 0, status: 'Empty' };
+		var g = Game.Objects['Farm'].minigame;
+		if (!g || !g.plot || !g.plot[y] || !g.plot[y][x]) {
+			return { isEmpty: true, name: 'Empty', growth: 0, status: 'Empty' };
+		}
+		var tile = g.plot[y][x];
+		if (!tile || tile[0] === 0) {
+			return { isEmpty: true, name: 'Empty', growth: 0, status: 'Empty' };
+		}
+		var plantId = tile[0] - 1;
+		var plant = g.plantsById[plantId];
+		if (!plant) {
+			return { isEmpty: false, name: 'Unknown', growth: 0, status: 'Unknown plant' };
+		}
+		var age = tile[1];
+		var mature = plant.mature || 100;
+		var growthPct = Math.floor((age / mature) * 100);
+		var isMature = age >= mature;
+		var status = isMature ? 'Mature' : (growthPct < 33 ? 'Budding' : 'Growing');
+		return {
+			isEmpty: false,
+			name: plant.name,
+			growth: growthPct,
+			status: status,
+			isMature: isMature,
+			plantId: plantId
+		};
+	},
+	// Announce message via Garden live region
+	gardenAnnounce: function(message) {
+		var liveRegion = l('a11yGardenAnnouncer');
+		if (liveRegion) {
+			liveRegion.textContent = '';
+			setTimeout(function() {
+				liveRegion.textContent = message;
+			}, 50);
+		}
+	},
+	// Harvest plant at plot
+	harvestPlot: function(x, y) {
+		var MOD = this;
+		if (!MOD.gardenReady()) return;
+		var g = Game.Objects['Farm'].minigame;
+		var info = MOD.getGardenTileInfo(x, y);
+		if (info.isEmpty) {
+			MOD.gardenAnnounce('Plot ' + (x+1) + ',' + (y+1) + ' is empty');
+			return;
+		}
+		if (!info.isMature) {
+			MOD.gardenAnnounce(info.name + ' at plot ' + (x+1) + ',' + (y+1) + ' is ' + info.growth + '% grown, not ready to harvest');
+			return;
+		}
+		g.harvest(x, y);
+		MOD.gardenAnnounce('Harvested ' + info.name + ' from plot ' + (x+1) + ',' + (y+1));
+		setTimeout(function() { MOD.updateAllPlotButtons(); MOD.updateGardenPanelStatus(); }, 100);
+	},
+	// Plant at plot (uses selected seed)
+	plantAtPlot: function(x, y) {
+		var MOD = this;
+		if (!MOD.gardenReady()) return;
+		var g = Game.Objects['Farm'].minigame;
+		var info = MOD.getGardenTileInfo(x, y);
+		// If plot has a plant, try to harvest it
+		if (!info.isEmpty) {
+			MOD.harvestPlot(x, y);
+			return;
+		}
+		// Check if seed is selected
+		if (g.seedSelected < 0) {
+			MOD.gardenAnnounce('Select a seed first before planting');
+			return;
+		}
+		var seed = g.plantsById[g.seedSelected];
+		if (!seed) {
+			MOD.gardenAnnounce('Invalid seed selected');
+			return;
+		}
+		// Plant the seed
+		var result = g.useTool(g.seedSelected, x, y);
+		if (result) {
+			MOD.gardenAnnounce('Planted ' + seed.name + ' at plot ' + (x+1) + ',' + (y+1));
+		} else {
+			MOD.gardenAnnounce('Cannot plant ' + seed.name + '. Not enough cookies or tile is locked');
+		}
+		setTimeout(function() { MOD.updateAllPlotButtons(); MOD.updateGardenPanelStatus(); }, 100);
+	},
+	// Get list of harvestable (mature) plants with coordinates
+	getHarvestablePlants: function(g) {
+		var plants = [];
+		if (!g || !g.plot) return plants;
+		for (var y = 0; y < 6; y++) {
+			for (var x = 0; x < 6; x++) {
+				var tile = g.plot[y] && g.plot[y][x];
+				if (!tile || tile[0] === 0) continue;
+				var plantId = tile[0] - 1;
+				var plant = g.plantsById[plantId];
+				if (!plant) continue;
+				var age = tile[1];
+				var mature = plant.mature || 100;
+				if (age >= mature) {
+					plants.push({
+						name: plant.name,
+						x: x,
+						y: y
+					});
+				}
+			}
+		}
+		return plants;
+	},
+	// Get list of unlocked seeds with effects
+	getUnlockedSeeds: function(g) {
+		var MOD = this;
+		var seeds = [];
+		if (!g || !g.plantsById) return seeds;
+		for (var id in g.plantsById) {
+			var plant = g.plantsById[id];
+			if (!plant || !plant.unlocked) continue;
+			var effect = plant.effsStr ? MOD.stripHtml(plant.effsStr) : 'No special effects';
+			seeds.push({
+				id: parseInt(id),
+				name: plant.name,
+				effect: effect
+			});
+		}
+		return seeds;
+	},
+	// Update Garden panel status and harvestable plants (lightweight refresh)
+	updateGardenPanelStatus: function() {
+		var MOD = this;
+		if (!MOD.gardenReady()) return;
+		var g = Game.Objects['Farm'].minigame;
+		// Count plants and harvestable
+		var harvestable = MOD.getHarvestablePlants(g);
+		var plantsCount = 0;
+		for (var py = 0; py < 6; py++) {
+			for (var px = 0; px < 6; px++) {
+				var tile = g.plot[py] && g.plot[py][px];
+				if (tile && tile[0] > 0) plantsCount++;
+			}
+		}
 		// Update status display
 		var statusDiv = l('a11yGardenStatus');
 		if (statusDiv) {
-			var freezeStatus = g.freeze ? 'FROZEN (plants not growing)' : 'Active';
+			var freezeStatus = g.freeze ? 'FROZEN' : 'Active';
 			var soilName = g.soils && g.soil !== undefined && g.soils[g.soil] ? g.soils[g.soil].name : 'Unknown';
-			statusDiv.innerHTML = '<strong>Status:</strong> ' + freezeStatus + ' | <strong>Soil:</strong> ' + soilName;
+			statusDiv.textContent = 'Status: ' + freezeStatus + ' | Soil: ' + soilName + ' | ' + plantsCount + ' plants, ' + harvestable.length + ' ready to harvest';
 		}
 		// Also re-label the original garden elements
 		MOD.labelOriginalGardenElements(g);
-		// Update accessible panel plot labels
-		for (var y = 0; y < g.plotHeight; y++) {
-			for (var x = 0; x < g.plotWidth; x++) {
-				var plotBtn = l('a11yGardenPlot-' + y + '-' + x);
-				if (!plotBtn) continue;
-				var t = g.plot[y] && g.plot[y][x];
-				var lbl = 'Row ' + (y+1) + ' Col ' + (x+1) + ': ';
-				if (t && t[0] > 0) {
-					var pl = g.plantsById[t[0] - 1];
-					if (pl) {
-						var mature = pl.mature || 100;
-						var pct = Math.floor((t[1] / mature) * 100);
-						lbl += pl.name + ' ' + pct + '%';
-						plotBtn.textContent = pl.name.substring(0, 3) + ' ' + pct + '%';
-						if (t[1] >= mature) {
-							lbl += ' READY';
-							plotBtn.style.background = '#353';
-						} else {
-							plotBtn.style.background = '#222';
-						}
-					}
-				} else {
-					lbl += 'Empty';
-					plotBtn.textContent = '-';
-					plotBtn.style.background = '#222';
-				}
-				plotBtn.setAttribute('aria-label', lbl);
-			}
-		}
+		// Update accessible plot buttons in-place
+		MOD.updateAllPlotButtons();
 	},
 	pantheonReady: function() {
 		try {
@@ -2255,6 +2360,13 @@ Game.registerMod("nvda accessibility", {
 			}
 			if (Game.Objects['Bank'] && Game.Objects['Bank'].minigame && Game.Objects['Bank'].onMinigame) {
 				MOD.enhanceStockMarketMinigame();
+			}
+			// Update Garden panel when Farm minigame is visible
+			if (MOD.gardenReady() && Game.Objects['Farm'].onMinigame) {
+				if (!l('a11yGardenPanel')) {
+					MOD.enhanceGardenMinigame();
+				}
+				MOD.updateGardenPanelStatus();
 			}
 		}
 		// Refresh upgrade shop when store changes

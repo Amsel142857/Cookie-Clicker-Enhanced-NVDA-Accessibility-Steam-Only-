@@ -14,7 +14,6 @@ var GardenModule = (function() {
 	var focusY = 0;
 	var isActive = false;
 	var liveRegion = null;
-	var selectedSeed = -1;
 	var panelCreated = false;
 
 	/**
@@ -78,9 +77,9 @@ var GardenModule = (function() {
 
 		if (info.isEmpty) {
 			text += 'Empty';
-			if (selectedSeed >= 0) {
-				var g = getGarden();
-				var seed = g.plantsById[selectedSeed];
+			var g = getGarden();
+			if (g.seedSelected >= 0) {
+				var seed = g.plantsById[g.seedSelected];
 				if (seed) {
 					text += '. Press Enter to plant ' + seed.name;
 				}
@@ -176,10 +175,10 @@ var GardenModule = (function() {
 
 		var info = getTileInfo(x, y);
 
-		if (info.isEmpty && selectedSeed >= 0) {
+		if (info.isEmpty && g.seedSelected >= 0) {
 			// Plant the selected seed
-			g.useTool(selectedSeed, x, y);
-			var seed = g.plantsById[selectedSeed];
+			g.useTool(g.seedSelected, x, y);
+			var seed = g.plantsById[g.seedSelected];
 			announce('Planted ' + (seed ? seed.name : 'seed') + ' at ' + (x + 1) + ',' + (y + 1));
 		} else if (!info.isEmpty && info.isMature) {
 			// Harvest mature plant
@@ -288,98 +287,12 @@ var GardenModule = (function() {
 		});
 		panel.appendChild(enterGridBtn);
 
-		// Tools section
-		var toolsHeading = document.createElement('h3');
-		toolsHeading.textContent = 'Tools';
-		toolsHeading.style.cssText = 'color:#ccc;margin:15px 0 5px 0;font-size:14px;';
-		panel.appendChild(toolsHeading);
-
-		var toolsDiv = document.createElement('div');
-		toolsDiv.style.cssText = 'margin-bottom:10px;';
-
-		// Harvest All button
-		var harvestBtn = createToolButton('Harvest All', 'Harvest all mature plants', function() {
-			var g = getGarden();
-			if (g && g.harvestAll) {
-				g.harvestAll();
-				announce('Harvested all mature plants');
-			}
-		});
-		toolsDiv.appendChild(harvestBtn);
-
-		// Freeze/Unfreeze button
-		var freezeBtn = createToolButton(
-			g.freeze ? 'Unfreeze Garden' : 'Freeze Garden',
-			g.freeze ? 'Resume plant growth' : 'Pause all plant growth',
-			function() {
-				var g = getGarden();
-				g.freeze = g.freeze ? 0 : 1;
-				announce(g.freeze ? 'Garden frozen' : 'Garden unfrozen');
-				this.textContent = g.freeze ? 'Unfreeze Garden' : 'Freeze Garden';
-			}
-		);
-		toolsDiv.appendChild(freezeBtn);
-
-		panel.appendChild(toolsDiv);
-
-		// Seeds section
-		var seedsHeading = document.createElement('h3');
-		seedsHeading.textContent = 'Seeds (select one, then use grid to plant)';
-		seedsHeading.style.cssText = 'color:#ccc;margin:15px 0 5px 0;font-size:14px;';
-		panel.appendChild(seedsHeading);
-
-		var seedsDiv = document.createElement('div');
-		seedsDiv.id = 'a11yGardenSeedsContainer';
-		seedsDiv.setAttribute('role', 'listbox');
-		seedsDiv.setAttribute('aria-label', 'Available seeds');
-		seedsDiv.style.cssText = 'max-height:150px;overflow-y:auto;background:#222;padding:5px;';
-
-		// Add seed buttons
-		for (var id in g.plantsById) {
-			var plant = g.plantsById[id];
-			if (!plant || !plant.unlocked) continue;
-
-			(function(p, seedId) {
-				var seedBtn = document.createElement('button');
-				seedBtn.setAttribute('role', 'option');
-				seedBtn.setAttribute('aria-selected', selectedSeed == seedId ? 'true' : 'false');
-				seedBtn.textContent = p.name + (selectedSeed == seedId ? ' (SELECTED)' : '');
-				seedBtn.style.cssText = 'display:block;width:100%;padding:6px;margin:2px 0;background:' +
-					(selectedSeed == seedId ? '#353' : '#333') +
-					';border:1px solid ' + (selectedSeed == seedId ? '#4a4' : '#555') +
-					';color:#fff;cursor:pointer;text-align:left;';
-
-				seedBtn.addEventListener('click', function() {
-					selectedSeed = parseInt(seedId);
-					g.seedSelected = selectedSeed;
-					announce(p.name + ' seed selected. Enter grid and press Enter on empty plot to plant');
-					updateSeedSelection();
-				});
-
-				seedsDiv.appendChild(seedBtn);
-			})(plant, id);
-		}
-
-		panel.appendChild(seedsDiv);
-
 		// Insert panel
 		container.parentNode.insertBefore(panel, container.nextSibling);
 		panelCreated = true;
 
 		// Add global keyboard listener for grid navigation
 		document.addEventListener('keydown', handleKeyDown);
-	}
-
-	/**
-	 * Create a tool button
-	 */
-	function createToolButton(text, ariaLabel, onClick) {
-		var btn = document.createElement('button');
-		btn.textContent = text;
-		btn.setAttribute('aria-label', ariaLabel);
-		btn.style.cssText = 'padding:8px 12px;margin:2px;background:#363;border:1px solid #4a4;color:#fff;cursor:pointer;';
-		btn.addEventListener('click', onClick);
-		return btn;
 	}
 
 	/**
@@ -391,32 +304,6 @@ var GardenModule = (function() {
 		statusEl.innerHTML = '<strong>Status:</strong> ' + freezeStatus +
 			' | <strong>Soil:</strong> ' + soilName +
 			' | <strong>Grid:</strong> ' + g.plotWidth + 'x' + g.plotHeight;
-	}
-
-	/**
-	 * Update seed selection visual state
-	 */
-	function updateSeedSelection() {
-		var container = document.getElementById('a11yGardenSeedsContainer');
-		if (!container) return;
-
-		var buttons = container.querySelectorAll('button');
-		var g = getGarden();
-
-		buttons.forEach(function(btn, idx) {
-			var plantId = Object.keys(g.plantsById).filter(function(k) {
-				return g.plantsById[k].unlocked;
-			})[idx];
-
-			if (plantId !== undefined) {
-				var plant = g.plantsById[plantId];
-				var isSelected = selectedSeed == plantId;
-				btn.textContent = plant.name + (isSelected ? ' (SELECTED)' : '');
-				btn.setAttribute('aria-selected', isSelected ? 'true' : 'false');
-				btn.style.background = isSelected ? '#353' : '#333';
-				btn.style.borderColor = isSelected ? '#4a4' : '#555';
-			}
-		});
 	}
 
 	/**
