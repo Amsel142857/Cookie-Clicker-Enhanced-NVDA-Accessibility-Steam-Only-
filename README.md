@@ -22,18 +22,31 @@ Added support to the Stock Market... maybe.
 Added support for the Pantheon mini-game.
 Made drag-and-drop mechanics accessible. (So you can place your permanent upgrades, get the most of your dragon, and get help from Santa.)
 Added a little "Cookies per click" area right below the Big Cookie button, so you don't have to go hunting for it in the Statistics menu.
+Added a milk progress display showing your current milk type, rank, and percentage.
 Added live announcements for shimmers - you'll hear when a Golden Cookie, Wrath Cookie, or Reindeer appears, and when it's about to fade away. Click them manually in the game as you normally would.
 Made an H2 heading after the buildings to see your active buffs, and wrinklers.
 
 ## Known Issues
 
-- **Garden mini-game**: Currently not working. Avoid opening the Garden until this is fixed.
 - **Statistics menu**: Goals for enhanced statistics menu accessibility have been abandoned.
 
 ## Changelog
 
+### Version 9
+- Garden minigame now fully accessible with virtual grid navigation
+- Enter Garden Grid button to start navigating plots with arrow keys
+- Seed selection dialog appears when pressing Enter on empty plots
+- Harvestable plants section shows what's ready to harvest
+- Available seeds section shows unlocked seeds with their effects
+- All actions announced via live region for screen readers
+- Added milk progress display showing milk type, rank, and percentage
+- Soil buttons now work with keyboard (Enter/Space) and show farm requirements for locked soils
+- Simplified plot labels to coordinates only (e.g., "3, 3:" instead of "Plot row 3, column 3:")
+- Hidden FPS counter and other irrelevant numbers from screen readers
+- Hidden elements containing "undefined" text
+- Clearer startup message: "NVDA Accessibility mod loaded successfully"
+
 ### Version 8
-- Garden is not working.
 - Pantheon is tentatively working.
 - Shimmers might be fixed.
 - Mod might be complete.
