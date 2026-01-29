@@ -14,6 +14,8 @@ Game.registerMod("nvda accessibility", {
 		this.announcedShimmers = {}; // Track shimmers we've announced appearing
 		this.fadingShimmers = {}; // Track shimmers we've announced as fading
 		this.shimmerButtons = {}; // Track shimmer buttons by ID
+		// Wrinkler tracking - announce once on spawn
+		this.announcedWrinklers = {}; // Track wrinklers we've announced spawning
 		// Override Game.DrawBuildings to inject accessibility labels
 		MOD.overrideDrawBuildings();
 		// Track if we've announced the fix
@@ -277,12 +279,9 @@ Game.registerMod("nvda accessibility", {
 			heading.textContent = 'Wrinklers';
 			heading.style.cssText = 'color:#faa;margin:0 0 10px 0;font-size:16px;';
 			c.appendChild(heading);
-			// Insert after Active Buffs panel if exists, otherwise after products
-			var buffsPanel = l('a11yActiveBuffsPanel');
+			// Insert after products
 			var products = l('products');
-			if (buffsPanel && buffsPanel.parentNode) {
-				buffsPanel.parentNode.insertBefore(c, buffsPanel.nextSibling);
-			} else if (products && products.parentNode) {
+			if (products && products.parentNode) {
 				products.parentNode.insertBefore(c, products.nextSibling);
 			} else {
 				document.body.appendChild(c);
@@ -340,19 +339,37 @@ Game.registerMod("nvda accessibility", {
 		var MOD = this;
 		if (!Game.wrinklers) return;
 		var activeCount = 0;
+		var currentWrinklers = {}; // Track which slots have active wrinklers this frame
+
 		for (var i = 0; i < Game.wrinklers.length && i < MOD.wrinklerOverlays.length; i++) {
 			var w = Game.wrinklers[i], o = MOD.wrinklerOverlays[i];
 			if (!o) continue;
 			if (w && w.phase > 0) {
 				activeCount++;
+				currentWrinklers[i] = true;
 				var s = Beautify(w.sucked), t = w.type === 1 ? 'Shiny ' : '';
 				o.setAttribute('aria-label', t + 'Wrinkler ' + (i + 1) + ': ' + s + ' cookies sucked. Click to pop.');
 				o.style.display = 'inline-block';
+
+				// Announce new wrinkler spawn (only once per wrinkler)
+				if (!MOD.announcedWrinklers[i]) {
+					MOD.announcedWrinklers[i] = true;
+					var wrinklerType = w.type === 1 ? 'A shiny wrinkler' : 'A wrinkler';
+					MOD.announceUrgent(wrinklerType + ' has appeared!');
+				}
 			} else {
 				o.setAttribute('aria-label', 'Wrinkler slot ' + (i + 1) + ': Empty');
 				o.style.display = 'none';
 			}
 		}
+
+		// Clean up tracking for wrinklers that no longer exist (popped or gone)
+		for (var id in MOD.announcedWrinklers) {
+			if (!currentWrinklers[id]) {
+				delete MOD.announcedWrinklers[id];
+			}
+		}
+
 		// Show/hide the "no wrinklers" message
 		var noWrinklersMsg = l('a11yNoWrinklersMsg');
 		if (noWrinklersMsg) {
@@ -391,11 +408,11 @@ Game.registerMod("nvda accessibility", {
 		btnContainer.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;';
 		c.appendChild(btnContainer);
 
-		// Insert after wrinkler panel if exists, otherwise after products
-		var wrinklerPanel = l('wrinklerOverlayContainer');
+		// Insert after Active Buffs panel if exists, otherwise after products
+		var buffsPanel = l('a11yActiveBuffsPanel');
 		var products = l('products');
-		if (wrinklerPanel && wrinklerPanel.parentNode) {
-			wrinklerPanel.parentNode.insertBefore(c, wrinklerPanel.nextSibling);
+		if (buffsPanel && buffsPanel.parentNode) {
+			buffsPanel.parentNode.insertBefore(c, buffsPanel.nextSibling);
 		} else if (products && products.parentNode) {
 			products.parentNode.insertBefore(c, products.nextSibling);
 		} else {
@@ -912,7 +929,7 @@ Game.registerMod("nvda accessibility", {
 		if (!Game.shimmers) return;
 
 		var currentShimmerIds = {};
-		var FADE_WARNING_FRAMES = 60; // 2 seconds at 30fps
+		var FADE_WARNING_FRAMES = 150; // 5 seconds at 30fps
 
 		// Process each active shimmer
 		Game.shimmers.forEach(function(shimmer) {
@@ -928,12 +945,12 @@ Game.registerMod("nvda accessibility", {
 				MOD.announceUrgent('A ' + variant + ' has appeared!');
 			}
 
-			// Check if fading (2 seconds before disappearing)
+			// Check if fading (5 seconds before disappearing)
 			// shimmer.life is remaining life in frames, shimmer.dur is total duration
 			if (shimmer.life !== undefined && shimmer.life <= FADE_WARNING_FRAMES) {
 				if (!MOD.fadingShimmers[id]) {
 					MOD.fadingShimmers[id] = true;
-					MOD.announce(variant + ' is fading!');
+					MOD.announceUrgent(variant + ' is fading!');
 				}
 			}
 		});
@@ -2990,8 +3007,13 @@ Game.registerMod("nvda accessibility", {
 		buffList.style.cssText = 'color:#fff;font-size:14px;';
 		buffList.textContent = 'No active buffs';
 		panel.appendChild(buffList);
-		// Insert after products
-		products.parentNode.insertBefore(panel, products.nextSibling);
+		// Insert after Wrinklers panel if exists, otherwise after products
+		var wrinklerPanel = l('wrinklerOverlayContainer');
+		if (wrinklerPanel && wrinklerPanel.parentNode) {
+			wrinklerPanel.parentNode.insertBefore(panel, wrinklerPanel.nextSibling);
+		} else {
+			products.parentNode.insertBefore(panel, products.nextSibling);
+		}
 	},
 	updateActiveBuffsPanel: function() {
 		var MOD = this;
