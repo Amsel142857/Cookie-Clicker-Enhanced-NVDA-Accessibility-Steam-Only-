@@ -1323,7 +1323,7 @@ Game.registerMod("nvda accessibility", {
 				var tile = l('gardenTile-' + x + '-' + y);
 				if (!tile) continue;
 				var t = g.plot[y] && g.plot[y][x];
-				var lbl = 'Row ' + (y+1) + ', column ' + (x+1) + ': ';
+				var lbl = 'R' + (y+1) + ', C' + (x+1) + ': ';
 				if (t && t[0] > 0) {
 					var pl = g.plantsById[t[0] - 1];
 					if (pl) {
@@ -1395,7 +1395,7 @@ Game.registerMod("nvda accessibility", {
 				if (toolKey === 'info') {
 					lbl = 'Garden information and tips';
 				} else if (toolKey === 'harvestAll') {
-					lbl = 'Harvest all plants. Click to harvest all mature plants in your garden';
+					lbl = 'Harvest all plants. Harvests all plants including immature ones';
 				} else if (toolKey === 'freeze') {
 					lbl = g.freeze ? 'Unfreeze garden. Currently FROZEN - plants are paused' : 'Freeze garden. Pauses all plant growth';
 				} else if (toolKey === 'convert') {
@@ -1429,7 +1429,7 @@ Game.registerMod("nvda accessibility", {
 			if (toolEl && !toolEl.getAttribute('aria-label')) {
 				var labels = [
 					'Garden information and tips',
-					'Harvest all plants',
+					'Harvest all plants. Harvests all plants including immature ones',
 					g.freeze ? 'Unfreeze garden (currently frozen)' : 'Freeze garden',
 					'Sacrifice garden for sugar lumps'
 				];
@@ -1523,9 +1523,13 @@ Game.registerMod("nvda accessibility", {
 			}
 			// Add soil effects
 			var effects = [];
+			if (soil.tick && soil.tick !== 5) effects.push('tick every ' + soil.tick + ' minutes');
+			if (soil.effMult && soil.effMult !== 1) effects.push('plant effects ' + Math.round(soil.effMult * 100) + '%');
 			if (soil.weedMult && soil.weedMult !== 1) effects.push('weeds ' + Math.round(soil.weedMult * 100) + '%');
-			if (soil.agingMult && soil.agingMult !== 1) effects.push('growth ' + Math.round(soil.agingMult * 100) + '%');
-			if (soil.effiMult && soil.effiMult !== 1) effects.push('effects ' + Math.round(soil.effiMult * 100) + '%');
+			// Add special effects for pebbles and woodchips
+			var soilKey = soil.key || '';
+			if (soilKey === 'pebbles') effects.push('35% chance to auto-harvest seeds');
+			if (soilKey === 'woodchips') effects.push('3x spread and mutation');
 			if (effects.length > 0) lbl += '. ' + effects.join(', ');
 			soilEl.setAttribute('aria-label', lbl);
 			soilEl.setAttribute('role', 'button');
@@ -1640,7 +1644,7 @@ Game.registerMod("nvda accessibility", {
 		if (g.seedSelected >= 0 && g.plantsById[g.seedSelected]) {
 			selectedSeedName = g.plantsById[g.seedSelected].name;
 		}
-		var label = 'Row ' + (y+1) + ', column ' + (x+1) + ': ';
+		var label = 'R' + (y+1) + ', C' + (x+1) + ': ';
 		if (info.isEmpty) {
 			if (selectedSeedName) {
 				label += 'Empty. Press Enter to plant ' + selectedSeedName;
@@ -1908,15 +1912,15 @@ Game.registerMod("nvda accessibility", {
 		var g = Game.Objects['Farm'].minigame;
 		var info = MOD.getGardenTileInfo(x, y);
 		if (info.isEmpty) {
-			MOD.gardenAnnounce('Row ' + (y+1) + ', column ' + (x+1) + ' is empty');
+			MOD.gardenAnnounce('R' + (y+1) + ', C' + (x+1) + ', empty');
 			return;
 		}
 		if (!info.isMature) {
-			MOD.gardenAnnounce(info.name + ' at row ' + (y+1) + ', column ' + (x+1) + ' is ' + info.growth + '% grown, not ready to harvest');
+			MOD.gardenAnnounce(info.name + ' at R' + (y+1) + ', C' + (x+1) + ' is ' + info.growth + '% grown, not ready to harvest');
 			return;
 		}
 		g.harvest(x, y);
-		MOD.gardenAnnounce('Harvested ' + info.name + ' from row ' + (y+1) + ', column ' + (x+1));
+		MOD.gardenAnnounce('Harvested ' + info.name + ' from R' + (y+1) + ', C' + (x+1));
 		setTimeout(function() { MOD.updateAllPlotButtons(); MOD.updateGardenPanelStatus(); }, 100);
 	},
 	// Plant at plot (uses selected seed)
@@ -1943,7 +1947,7 @@ Game.registerMod("nvda accessibility", {
 		// Plant the seed
 		var result = g.useTool(g.seedSelected, x, y);
 		if (result) {
-			MOD.gardenAnnounce('Planted ' + seed.name + ' at row ' + (y+1) + ', column ' + (x+1));
+			MOD.gardenAnnounce('Planted ' + seed.name + ' at R' + (y+1) + ', C' + (x+1));
 		} else {
 			MOD.gardenAnnounce('Cannot plant ' + seed.name + '. Not enough cookies or tile is locked');
 		}
