@@ -16,6 +16,10 @@ Game.registerMod("nvda accessibility", {
 		this.shimmerButtons = {}; // Track shimmer buttons by ID
 		// Wrinkler tracking - announce once on spawn
 		this.announcedWrinklers = {}; // Track wrinklers we've announced spawning
+		// Rapid-fire event tracking (cookie chains, cookie storms)
+		this.cookieChainActive = false;
+		this.cookieStormActive = false;
+		this.stormClickCount = 0;
 		// Override Game.DrawBuildings to inject accessibility labels
 		MOD.overrideDrawBuildings();
 		// Track if we've announced the fix
@@ -296,6 +300,8 @@ Game.registerMod("nvda accessibility", {
 			// Remove old elements if they exist
 			var oldNoWrinklersMsg = l('a11yNoWrinklersMsg');
 			if (oldNoWrinklersMsg) oldNoWrinklersMsg.remove();
+			var oldBtnContainer = l('wrinklerButtonContainer');
+			if (oldBtnContainer) oldBtnContainer.remove();
 		}
 		// Create "no wrinklers" message
 		var noWrinklersMsg = document.createElement('div');
@@ -305,12 +311,23 @@ Game.registerMod("nvda accessibility", {
 		noWrinklersMsg.textContent = 'No wrinklers present.';
 		c.appendChild(noWrinklersMsg);
 
+		// Create container with list semantics for wrinkler buttons
+		var btnContainer = document.createElement('div');
+		btnContainer.id = 'wrinklerButtonContainer';
+		btnContainer.setAttribute('role', 'list');
+		c.appendChild(btnContainer);
+
 		for (var i = 0; i < 12; i++) {
+			// Wrapper provides listitem role without overriding button semantics
+			var wrapper = document.createElement('div');
+			wrapper.setAttribute('role', 'listitem');
+			wrapper.style.cssText = 'display:inline-block;';
+
 			var btn = document.createElement('button');
 			btn.id = 'wrinklerOverlay' + i;
 			btn.setAttribute('tabindex', '0');
 			btn.style.cssText = 'padding:8px 12px;background:#1a1a1a;color:#fff;border:1px solid #666;cursor:pointer;font-size:12px;margin:2px;';
-			btn.textContent = 'Wrinkler slot ' + (i + 1) + ': Empty';
+			btn.textContent = 'Empty wrinkler slot';
 			(function(idx) {
 				btn.addEventListener('click', function() {
 					var w = Game.wrinklers[idx];
@@ -328,7 +345,8 @@ Game.registerMod("nvda accessibility", {
 					if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
 				});
 			})(i);
-			c.appendChild(btn);
+			wrapper.appendChild(btn);
+			btnContainer.appendChild(wrapper);
 			MOD.wrinklerOverlays.push(btn);
 		}
 	},
@@ -345,8 +363,8 @@ Game.registerMod("nvda accessibility", {
 				activeCount++;
 				currentWrinklers[i] = true;
 				var s = Beautify(w.sucked), t = w.type === 1 ? 'Shiny ' : '';
-				o.textContent = t + 'Wrinkler ' + (i + 1) + ': ' + s + ' cookies sucked. Click to pop.';
-				o.style.display = 'inline-block';
+				o.textContent = t + 'Wrinkler: ' + s + ' cookies sucked. Click to pop.';
+				o.parentNode.style.display = 'inline-block';
 
 				// Announce new wrinkler spawn (only once per wrinkler)
 				if (!MOD.announcedWrinklers[i]) {
@@ -355,8 +373,8 @@ Game.registerMod("nvda accessibility", {
 					MOD.announceUrgent(wrinklerType + ' has appeared!');
 				}
 			} else {
-				o.textContent = 'Wrinkler slot ' + (i + 1) + ': Empty';
-				o.style.display = 'none';
+				o.textContent = 'Empty wrinkler slot';
+				o.parentNode.style.display = 'none';
 			}
 		}
 
@@ -868,6 +886,21 @@ Game.registerMod("nvda accessibility", {
 			var orig = Game.shimmerTypes.golden.popFunc;
 			Game.shimmerTypes.golden.popFunc = function(me) {
 				var r = orig.call(this, me);
+
+				// Check if this is a storm drop or chain cookie
+				var isStormDrop = me.forceObj && me.forceObj.type === 'cookie storm drop';
+
+				// Count storm clicks for summary
+				if (isStormDrop && MOD.cookieStormActive) {
+					MOD.stormClickCount++;
+					return r; // Suppress individual announcement
+				}
+
+				// Suppress during active chain
+				if (MOD.cookieChainActive) {
+					return r;
+				}
+
 				var variant = MOD.getShimmerVariantName(me);
 				if (me.lastPopText) {
 					MOD.announceUrgent(variant + ' clicked! ' + MOD.stripHtml(me.lastPopText));
@@ -936,18 +969,26 @@ Game.registerMod("nvda accessibility", {
 			// Get variant name
 			var variant = MOD.getShimmerVariantName(shimmer);
 
-			// Announce appearance (only once per shimmer)
+			// Check if this shimmer should be suppressed (rapid-fire events)
+			var isStormDrop = shimmer.forceObj && shimmer.forceObj.type === 'cookie storm drop';
+			var shouldSuppress = MOD.cookieChainActive || MOD.cookieStormActive || isStormDrop;
+
+			// Announce appearance (only once per shimmer, unless suppressed)
 			if (!MOD.announcedShimmers[id]) {
 				MOD.announcedShimmers[id] = true;
-				MOD.announceUrgent('A ' + variant + ' has appeared!');
+				if (!shouldSuppress) {
+					MOD.announceUrgent('A ' + variant + ' has appeared!');
+				}
 			}
 
-			// Check if fading (5 seconds before disappearing)
+			// Check if fading (5 seconds before disappearing, unless suppressed)
 			// shimmer.life is remaining life in frames, shimmer.dur is total duration
 			if (shimmer.life !== undefined && shimmer.life <= FADE_WARNING_FRAMES) {
 				if (!MOD.fadingShimmers[id]) {
 					MOD.fadingShimmers[id] = true;
-					MOD.announceUrgent(variant + ' is fading!');
+					if (!shouldSuppress) {
+						MOD.announceUrgent(variant + ' is fading!');
+					}
 				}
 			}
 		});
@@ -962,6 +1003,49 @@ Game.registerMod("nvda accessibility", {
 
 		// Update shimmer buttons
 		MOD.updateShimmerButtons();
+	},
+	/**
+	 * Track rapid-fire events (cookie chains, cookie storms) and announce start/end
+	 * Called before trackShimmerAnnouncements to set suppression flags
+	 */
+	trackRapidFireEvents: function() {
+		var MOD = this;
+
+		// Check Cookie Chain status
+		var chainData = Game.shimmerTypes && Game.shimmerTypes['golden'];
+		if (chainData) {
+			var currentChain = chainData.chain || 0;
+
+			if (currentChain > 0 && !MOD.cookieChainActive) {
+				MOD.cookieChainActive = true;
+				MOD.announceUrgent('Cookie chain started');
+			} else if (currentChain === 0 && MOD.cookieChainActive) {
+				MOD.cookieChainActive = false;
+				var total = chainData.totalFromChain || 0;
+				if (total > 0) {
+					MOD.announceUrgent('Cookie chain ended. Earned ' + Beautify(total) + ' cookies');
+				} else {
+					MOD.announceUrgent('Cookie chain ended');
+				}
+			}
+		}
+
+		// Check Cookie Storm status
+		var stormActive = Game.hasBuff && Game.hasBuff('Cookie storm');
+
+		if (stormActive && !MOD.cookieStormActive) {
+			MOD.cookieStormActive = true;
+			MOD.stormClickCount = 0;
+			MOD.announceUrgent('Cookie storm started');
+		} else if (!stormActive && MOD.cookieStormActive) {
+			MOD.cookieStormActive = false;
+			if (MOD.stormClickCount > 0) {
+				MOD.announceUrgent('Cookie storm ended. Collected ' + MOD.stormClickCount + ' cookies');
+			} else {
+				MOD.announceUrgent('Cookie storm ended');
+			}
+			MOD.stormClickCount = 0;
+		}
 	},
 	updateBuffTracker: function() {
 		var MOD = this;
@@ -2031,7 +2115,53 @@ Game.registerMod("nvda accessibility", {
 		var slots = ['Diamond', 'Ruby', 'Jade'];
 		// Enhance the minigame header
 		MOD.enhanceMinigameHeader(Game.Objects['Temple'], 'Pantheon', pan);
-		// Enhance spirit slots - clicking clears the slot
+		// Reorder DOM elements: slots first, then gods in order
+		var firstSlot = l('templeSlot0');
+		if (firstSlot && firstSlot.parentNode && !firstSlot.parentNode.dataset.a11yReordered) {
+			var parent = firstSlot.parentNode;
+			// Move slots to the beginning (in reverse order so they end up 0, 1, 2)
+			for (var i = 2; i >= 0; i--) {
+				var slotEl = l('templeSlot' + i);
+				if (slotEl) {
+					parent.insertBefore(slotEl, parent.firstChild);
+				}
+			}
+			// Move gods after slots (sorted by id)
+			var godIds = Object.keys(pan.gods).sort(function(a, b) { return parseInt(a) - parseInt(b); });
+			var lastSlot = l('templeSlot2');
+			var insertPoint = lastSlot ? lastSlot.nextSibling : null;
+			for (var j = 0; j < godIds.length; j++) {
+				var godId = pan.gods[godIds[j]].id;
+				var godEl = l('templeGod' + godId);
+				if (godEl) {
+					// Move elements in order: heading, flavor, buff, god, buttons
+					var headingEl = l('a11y-god-heading-' + godId);
+					var flavorEl = l('a11y-god-flavor-' + godId);
+					var buffEl = l('a11y-god-buff-' + godId);
+					var elementsToMove = [headingEl, flavorEl, buffEl, godEl];
+					for (var k = 0; k < elementsToMove.length; k++) {
+						if (elementsToMove[k]) {
+							if (insertPoint) {
+								parent.insertBefore(elementsToMove[k], insertPoint);
+							} else {
+								parent.appendChild(elementsToMove[k]);
+							}
+						}
+					}
+					// Move button container if it exists (inserted after god)
+					var btnContainer = godEl.nextSibling;
+					if (btnContainer && btnContainer.className === 'a11y-spirit-controls') {
+						if (insertPoint) {
+							parent.insertBefore(btnContainer, insertPoint);
+						} else {
+							parent.appendChild(btnContainer);
+						}
+					}
+				}
+			}
+			parent.dataset.a11yReordered = 'true';
+		}
+		// Enhance spirit slots
 		for (var i = 0; i < 3; i++) {
 			var slotEl = l('templeSlot' + i);
 			if (!slotEl) continue;
@@ -2039,12 +2169,13 @@ Game.registerMod("nvda accessibility", {
 			var lbl = slots[i] + ' slot: ';
 			if (spiritId !== -1 && pan.gods[spiritId]) {
 				var god = pan.gods[spiritId];
-				lbl += god.name + '. Click to remove.';
+				lbl += god.name + '. Press Enter to remove.';
+				slotEl.setAttribute('role', 'button');
 			} else {
 				lbl += 'Empty';
+				slotEl.removeAttribute('role');
 			}
 			slotEl.setAttribute('aria-label', lbl);
-			slotEl.setAttribute('role', 'button');
 			slotEl.setAttribute('tabindex', '0');
 			if (!slotEl.dataset.a11yEnhanced) {
 				slotEl.dataset.a11yEnhanced = 'true';
@@ -2055,29 +2186,74 @@ Game.registerMod("nvda accessibility", {
 							if (pan.slot[slotIndex] !== -1) {
 								pan.slotGod(pan.gods[pan.slot[slotIndex]], -1);
 								MOD.announce(slots[slotIndex] + ' slot cleared');
-								MOD.enhancePantheonMinigame();
+								setTimeout(function() { MOD.enhancePantheonMinigame(); }, 100);
 							}
 						}
 					});
 				})(i);
 			}
 		}
-		// Enhance spirit icons and add slot assignment buttons
+		// Move game's worship swaps info to after slots
+		var lastSlot = l('templeSlot2');
+		if (lastSlot) {
+			var templeContent = l('templeContent');
+			if (templeContent) {
+				// Find the game's swap info element (contains "swap" text, typically at bottom)
+				var allDivs = templeContent.querySelectorAll('div');
+				for (var d = 0; d < allDivs.length; d++) {
+					var div = allDivs[d];
+					if (div.textContent && div.textContent.toLowerCase().indexOf('swap') !== -1 &&
+						div.id !== 'a11y-pantheon-swaps' && !div.id.startsWith('templeSlot') && !div.id.startsWith('templeGod')) {
+						// Move this element after the last slot
+						if (!div.dataset.a11yMoved) {
+							div.dataset.a11yMoved = 'true';
+							div.setAttribute('tabindex', '0');
+							lastSlot.parentNode.insertBefore(div, lastSlot.nextSibling);
+						}
+						break;
+					}
+				}
+			}
+		}
+		// Enhance spirit icons
 		for (var id in pan.gods) {
 			var god = pan.gods[id];
 			var godEl = l('templeGod' + god.id);
 			if (!godEl) continue;
 			var slotted = pan.slot.indexOf(parseInt(id));
-			var inSlot = slotted >= 0 ? ' Currently in ' + slots[slotted] + ' slot.' : '';
+			var inSlot = slotted >= 0 ? 'Currently in ' + slots[slotted] + ' slot. ' : '';
 			var desc = god.desc1 || god.desc || '';
-			godEl.setAttribute('aria-label', god.name + '.' + inSlot + ' ' + MOD.stripHtml(desc));
-			godEl.setAttribute('role', 'button');
-			godEl.setAttribute('tabindex', '0');
-			// Add slot selection buttons after each spirit
+			var cleanDesc = MOD.stripHtml(desc).replace(/ +\./g, '.').replace(/ +,/g, ',');
+			var flavorText = god.quote ? MOD.stripHtml(god.quote).replace(/ +\./g, '.').replace(/ +,/g, ',') : '';
+			// Hide the god element from screen readers
+			godEl.setAttribute('aria-hidden', 'true');
+			godEl.removeAttribute('tabindex');
+			// Add h3 heading, flavor, buff, and slot buttons if not already added
 			if (!godEl.dataset.a11yEnhanced) {
 				godEl.dataset.a11yEnhanced = 'true';
+				// Add h3 heading before god element
+				var heading = document.createElement('h3');
+				heading.id = 'a11y-god-heading-' + god.id;
+				heading.textContent = god.name;
+				heading.style.cssText = 'position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;';
+				godEl.parentNode.insertBefore(heading, godEl);
+				// Add flavor text element
+				var flavorEl = document.createElement('div');
+				flavorEl.id = 'a11y-god-flavor-' + god.id;
+				flavorEl.style.cssText = 'position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;';
+				godEl.parentNode.insertBefore(flavorEl, godEl);
+				// Add buff text element
+				var buffEl = document.createElement('div');
+				buffEl.id = 'a11y-god-buff-' + god.id;
+				buffEl.style.cssText = 'position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;';
+				godEl.parentNode.insertBefore(buffEl, godEl);
 				MOD.createSpiritSlotButtons(god, godEl, pan, slots);
 			}
+			// Update flavor and buff text (can change when god is slotted/unslotted)
+			var flavorEl = l('a11y-god-flavor-' + god.id);
+			var buffEl = l('a11y-god-buff-' + god.id);
+			if (flavorEl) flavorEl.textContent = flavorText;
+			if (buffEl) buffEl.textContent = inSlot + cleanDesc;
 		}
 	},
 	createSpiritSlotButtons: function(god, godEl, pantheon, slots) {
@@ -2093,25 +2269,20 @@ Game.registerMod("nvda accessibility", {
 				btn.style.cssText = 'width:24px;height:24px;margin:2px;background:#333;color:#fff;border:1px solid #666;cursor:pointer;';
 				btn.addEventListener('click', function(e) {
 					e.stopPropagation();
+					if (pantheon.swaps <= 0) {
+						MOD.announce('Cannot place ' + god.name + '. No worship swaps available.');
+						return;
+					}
 					pantheon.slotGod(god, slotIndex);
 					MOD.announce(god.name + ' placed in ' + slotName + ' slot');
-					MOD.enhancePantheonMinigame();
-				});
-				btn.addEventListener('keydown', function(e) {
-					if (e.key === 'Enter' || e.key === ' ') {
-						e.preventDefault();
-						e.stopPropagation();
-						pantheon.slotGod(god, slotIndex);
-						MOD.announce(god.name + ' placed in ' + slotName + ' slot');
-						MOD.enhancePantheonMinigame();
-					}
+					setTimeout(function() { MOD.enhancePantheonMinigame(); }, 100);
 				});
 				container.appendChild(btn);
 			})(i, slots[i]);
 		}
 		godEl.parentNode.insertBefore(container, godEl.nextSibling);
 	},
-	enhanceGrimoireMinigame: function() {
+		enhanceGrimoireMinigame: function() {
 		var MOD = this, grim = Game.Objects['Wizard tower'] && Game.Objects['Wizard tower'].minigame;
 		if (!grim) return;
 		// Enhance the minigame header
@@ -2239,11 +2410,29 @@ Game.registerMod("nvda accessibility", {
 		// Big cookie
 		var bc = l('bigCookie');
 		if (bc) bc.setAttribute('aria-label', 'Big cookie - Click to bake cookies');
-		// Store section - H3 heading added in enhanceUpgradeShop, no H2 needed here
+		// Store section - H2 heading added in enhanceUpgradeShop
 		// Upgrades section
 		var up = l('upgrades');
 		if (up) { up.setAttribute('role', 'region'); up.setAttribute('aria-label', 'Available Upgrades'); }
 		// Buildings section - heading added in addStructuralHeadings
+		// Create a wrapper region around just the building elements (not buy/sell buttons)
+		var products = l('products');
+		if (products && !l('a11yBuildingsRegion')) {
+			var buildingsRegion = document.createElement('div');
+			buildingsRegion.id = 'a11yBuildingsRegion';
+			buildingsRegion.setAttribute('role', 'region');
+			buildingsRegion.setAttribute('aria-label', 'Available Buildings');
+			// Find first building element (product0) and insert wrapper before it
+			var firstBuilding = l('product0');
+			if (firstBuilding) {
+				products.insertBefore(buildingsRegion, firstBuilding);
+				// Move all product elements into the wrapper
+				var productElements = products.querySelectorAll('[id^="product"]');
+				productElements.forEach(function(el) {
+					buildingsRegion.appendChild(el);
+				});
+			}
+		}
 	},
 	addStructuralHeadings: function() {
 		var MOD = this;
@@ -2297,7 +2486,7 @@ Game.registerMod("nvda accessibility", {
 		if (uc) {
 			// Add Store heading right before the upgrades container
 			if (!l('a11yStoreHeading')) {
-				var storeHeading = document.createElement('h3');
+				var storeHeading = document.createElement('h2');
 				storeHeading.id = 'a11yStoreHeading';
 				storeHeading.textContent = 'Store';
 				storeHeading.style.cssText = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;';
@@ -2837,6 +3026,7 @@ Game.registerMod("nvda accessibility", {
 		var MOD = this;
 		// Track shimmer appearances every 5 ticks for timely announcements
 		if (Game.T % 5 === 0) {
+			MOD.trackRapidFireEvents();
 			MOD.trackShimmerAnnouncements();
 		}
 		// Run building minigame labels every 30 ticks
