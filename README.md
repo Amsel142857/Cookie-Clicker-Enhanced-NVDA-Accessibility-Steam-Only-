@@ -1,5 +1,11 @@
+# Cookie Clicker NVDA Accessibility Mod
+
 This is a mod to make Cookie Clicker more accessible with NVDA on Steam.
 This mod only works with the Steam version of the game, and might only work with NVDA.
+
+## AI Disclaimer
+
+All code in this mod was written by Claude (Anthropic's AI assistant). Human involvement was limited to prompting, direction, and QA testing.
 
 ## Installation
 
@@ -10,53 +16,82 @@ This mod only works with the Steam version of the game, and might only work with
 4. Launch Cookie Clicker and enable the mod in Options > Mods
 
 ## Features
-Made the buildings section beneath a heading, along with buttons. It is now a little chunkier because now the text is displayed to us, rather than some attempt at hover workarounds.
-Added "Time until affordable" to the buildings and upgrades sections.
-You can now see how much your buildings are producing, per second (individual buildings, and with all owned of that specific building), and in percentage of your total CPS.
-Added support for the upgrades store, with each actually showing labels on the buttons. You can now see the name, cost, effects, and flavor text of your upgrades, so you know what you are purchasing.
-Added support to the Ascension mechanic, so you aren't blindly flailing to prestige. You can now browse the list of Heavenly upgrades, and actually spend your chips. Remember, you won't be looking at all of them from the start...
-Updated the Grimoire to show the names of the spells, alongside the cost, and gave the effects of each beside them.
-Tentatively got the mini-game area, and sugar-lump-spending area to show things correctly (might need sighted confirmation), to be labelled.
-Added support to the Sugar Lump timer.
-Added support to the Stock Market... maybe.
-Added support for the Pantheon mini-game.
-Made drag-and-drop mechanics accessible. (So you can place your permanent upgrades, get the most of your dragon, and get help from Santa.)
-Added a little "Cookies per click" area right below the Big Cookie button, so you don't have to go hunting for it in the Statistics menu.
-Added a milk progress display showing your current milk type, rank, and percentage.
-Added live announcements for shimmers - you'll hear when a Golden Cookie, Wrath Cookie, or Reindeer appears, and when it's about to fade away. Click them manually in the game as you normally would.
-Made an H2 heading after the buildings to see your active buffs, and wrinklers.
+
+### Core Interface
+- Buildings section organized under headings with accessible buttons
+- "Time until affordable" displayed for buildings and upgrades
+- Building production stats showing cookies per second (individual and total), plus percentage of total CPS
+- Cookies per click display below the Big Cookie
+- Milk progress display showing current milk type, rank, and percentage
+- News ticker accessible as a heading region
+- Bulk pricing support (buy 1, 10, 100, or max)
+
+### Store and Upgrades
+- Upgrade shop with full labels showing name, cost, effects, and flavor text
+- Available Buildings region showing purchasable buildings
+
+### Minigames
+- **Garden**: Virtual grid navigation with arrow keys, seed selection dialogs, harvestable plants section, soil selection with keyboard support
+- **Grimoire**: Spell names, costs, and effects displayed
+- **Pantheon**: Spirit placement with keyboard support
+- **Stock Market**: Stock prices and trading information accessible
+
+### Prestige System
+- Ascension UI fully accessible for browsing and purchasing Heavenly upgrades
+- Permanent upgrade slots accessible via keyboard
+
+### Special Features
+- **Dragon (Krumblor)**: Aura slot selection accessible
+- **Santa**: Progress tracking accessible
+- **Shimmers**: Live announcements when Golden Cookies, Wrath Cookies, or Reindeer appear and when they're about to fade
+- **Wrinklers**: Spawn announcements, accessible buttons to pop wrinklers with cookie reward information
+- **Season changes**: Notifications when seasons change
+- **Active Buffs panel**: Shows current buffs and effects
+- **Sugar Lump timer**: Displays lump ripeness and harvest status
+
+### Accessibility Enhancements
+- Live region announcements for important game events
+- Hidden FPS counter and irrelevant visual elements from screen readers
+- Proper ARIA labels throughout the interface
 
 ## Known Issues
 
-- **Statistics menu**: Goals for enhanced statistics menu accessibility have been abandoned.
+- **Statistics menu**: Some statistics content may not be fully accessible.
 
 ## Changelog
 
+### Version 11.7
+- Added bulk pricing support for buildings
+- Added News heading for ticker accessibility
+- Fixed buff list formatting issues
+- Fixed live region announcements to show only the latest message
+
+### Version 11
+- Garden coordinates standardized to R#, C# format
+- Improved garden responsiveness and soil labels
+- Fixed minigame buttons not detected by screen reader
+- Added season change notifications and current season display
+- Added Available Buildings region
+- Fixed wrinkler buttons not being read properly by NVDA
+- Added wrinkler spawn announcements
+- Improved shimmer fading alerts
+
 ### Version 9
-- Garden minigame now fully accessible with virtual grid navigation
-- Enter Garden Grid button to start navigating plots with arrow keys
-- Seed selection dialog appears when pressing Enter on empty plots
-- Harvestable plants section shows what's ready to harvest
-- Available seeds section shows unlocked seeds with their effects
-- All actions announced via live region for screen readers
-- Added milk progress display showing milk type, rank, and percentage
-- Soil buttons now work with keyboard (Enter/Space) and show farm requirements for locked soils
-- Simplified plot labels to coordinates only (e.g., "3, 3:" instead of "Plot row 3, column 3:")
-- Hidden FPS counter and other irrelevant numbers from screen readers
-- Hidden elements containing "undefined" text
-- Clearer startup message: "NVDA Accessibility mod loaded successfully"
+- Garden minigame fully accessible with virtual grid navigation
+- Enter Garden Grid button for arrow key navigation
+- Seed selection dialog for empty plots
+- Harvestable plants and available seeds sections
+- Soil buttons work with keyboard (Enter/Space)
+- Hidden FPS counter and undefined elements from screen readers
 
 ### Version 8
-- Pantheon is tentatively working.
-- Shimmers might be fixed.
-- Mod might be complete.
+- Pantheon accessibility improvements with keyboard support
+- Shimmer announcement system (removed buttons, kept live announcements)
 
-This is still undergoing tests, so please, feedback will be greatly appreciated. As will assistance.
+## Credits
 
-Note:
-This is coded by ClaudeCode. If you'd like to help me out, I'd greatly appreciate it. Cookie Clicker is only the tip of the iceberg for what I would like to accomplish...
-Donations aren't mandatory, but might help updates come quicker...
-You can donate to:
-Dani Snyder (Venmo, US only, as I am to understand)
-ieshafox091498@gmail.com (PayPal)
-Thanks, and happy clicking!
+This mod is a fork of the original [Cookie Clicker NVDA Accessibility Mod](https://github.com/FioraXena/Cookie-Clicker-Enhanced-NVDA-Accessibility-Steam-Only-) by FioraXena.
+
+Development is being continued by Amsel, who provides prompting, direction, and QA testing, with all code written by Claude (Anthropic's AI assistant).
+
+Thanks to Orteil for creating Cookie Clicker!
