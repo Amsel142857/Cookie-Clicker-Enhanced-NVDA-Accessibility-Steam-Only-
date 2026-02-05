@@ -1240,7 +1240,7 @@ Game.registerMod("nvda accessibility", {
 			{ id: 'storeBulk1', label: 'Buy or sell 1 at a time' },
 			{ id: 'storeBulk10', label: 'Buy or sell 10 at a time' },
 			{ id: 'storeBulk100', label: 'Buy or sell 100 at a time' },
-			{ id: 'storeBulkMax', label: 'Buy maximum amount' }
+			{ id: 'storeBulkMax', label: 'Buy or sell maximum amount' }
 		];
 		amounts.forEach(function(amt) {
 			var btn = l(amt.id);
@@ -2349,54 +2349,152 @@ Game.registerMod("nvda accessibility", {
 		if (!grim) return;
 		// Enhance the minigame header
 		MOD.enhanceMinigameHeader(Game.Objects['Wizard tower'], 'Grimoire', grim);
-		// Magic meter status
-		var magicMeter = document.querySelector('.grimoireMagicM');
-		if (magicMeter) {
-			magicMeter.setAttribute('role', 'status');
-			magicMeter.setAttribute('aria-label', 'Magic: ' + Math.floor(grim.magic) + ' of ' + Math.floor(grim.magicM));
+
+		// Remove any old accessible panel if it exists
+		var oldPanel = l('a11yGrimoirePanel');
+		if (oldPanel) oldPanel.remove();
+
+		// Fix grimoire container accessibility - remove aria-hidden only
+		var grimContainer = l('row7minigame');
+		if (grimContainer) {
+			grimContainer.removeAttribute('aria-hidden');
+			// Fix parent elements that might have aria-hidden
+			var parent = grimContainer.parentNode;
+			while (parent && parent !== document.body) {
+				if (parent.getAttribute && parent.getAttribute('aria-hidden') === 'true') {
+					parent.removeAttribute('aria-hidden');
+				}
+				parent = parent.parentNode;
+			}
 		}
-		// Enhance spell buttons - name, cost, and whether castable
+
+		// Hide original game's magic/spells display text elements only
+		// Be careful not to hide containers that contain the spell icons
+		var origMagicBar = grimContainer ? grimContainer.querySelector('.grimoireBar') : null;
+		if (origMagicBar) {
+			// Only hide if it doesn't contain spell icons
+			if (!origMagicBar.querySelector('.grimoireSpell')) {
+				origMagicBar.setAttribute('aria-hidden', 'true');
+			}
+		}
+		var origInfo = grimContainer ? grimContainer.querySelector('.grimoireInfo') : null;
+		if (origInfo) {
+			// Only hide if it doesn't contain spell icons
+			if (!origInfo.querySelector('.grimoireSpell')) {
+				origInfo.setAttribute('aria-hidden', 'true');
+			}
+		}
+		// Also try to hide the magic meter text specifically
+		var magicMeter = grimContainer ? grimContainer.querySelector('.grimoireMagicM') : null;
+		if (magicMeter) {
+			magicMeter.setAttribute('aria-hidden', 'true');
+		}
+
+		// Get current magic values
+		var currentMagic = Math.floor(grim.magic);
+		var maxMagic = Math.floor(grim.magicM);
+		var spellsCast = grim.spellsCast || 0;
+		var spellsCastTotal = grim.spellsCastTotal || 0;
+		var magicText = 'Magic: ' + currentMagic + ' / ' + maxMagic + '. Spells cast: ' + spellsCast + ', total: ' + spellsCastTotal + '.';
+
+		// Find the first spell to determine where spells are located
+		var firstSpell = document.querySelector('.grimoireSpell');
+		var spellContainer = firstSpell ? firstSpell.parentNode : grimContainer;
+
+		// Add magic label at the very top of the spell container (same container as spells)
+		var magicLabelId = 'a11y-grimoire-magic';
+		var existingMagicLabel = l(magicLabelId);
+		if (!existingMagicLabel && spellContainer) {
+			var magicLabel = document.createElement('div');
+			magicLabel.id = magicLabelId;
+			magicLabel.setAttribute('tabindex', '0');
+			magicLabel.setAttribute('role', 'status');
+			magicLabel.style.cssText = 'display:block;font-size:12px;color:#fff;padding:5px;margin-bottom:10px;';
+			magicLabel.textContent = magicText;
+			spellContainer.insertBefore(magicLabel, spellContainer.firstChild);
+		} else if (existingMagicLabel) {
+			existingMagicLabel.textContent = magicText;
+		}
+
+		// Enhance spell buttons - order: H3 heading, cost/status, effect, then cast button
 		document.querySelectorAll('.grimoireSpell').forEach(function(b) {
 			var id = b.id.replace('grimoireSpell', ''), sp = grim.spellsById[id];
 			if (sp) {
 				var cost = Math.floor(grim.getSpellCost(sp) * 100) / 100;
-				var currentMagic = Math.floor(grim.magic);
 				var canCast = currentMagic >= cost;
-				// Button label: name, cost, whether castable
-				var lbl = sp.name + '. Cost: ' + cost + ' magic. ';
-				lbl += canCast ? 'Can cast.' : 'Not enough magic.';
-				b.setAttribute('aria-label', lbl);
-				b.setAttribute('role', 'button');
-				b.setAttribute('tabindex', '0');
-				if (!b.dataset.a11yEnhanced) {
-					b.dataset.a11yEnhanced = 'true';
-					b.addEventListener('keydown', function(e) {
-						if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); b.click(); }
-					});
+				var statusText = canCast ? 'Can cast' : 'Not enough magic';
+
+				// Ensure spell button's parent is accessible
+				var spellParent = b.parentNode;
+				if (spellParent) {
+					spellParent.removeAttribute('aria-hidden');
 				}
-				// Add effect text below spell (not a button)
-				MOD.ensureSpellEffectText(sp, b);
+
+				// Hide original spell icon from screen readers (it has no text)
+				b.setAttribute('aria-hidden', 'true');
+
+				// 1. Add H3 heading before spell
+				var spellHeadingId = 'a11y-spell-heading-' + sp.id;
+				var existingHeading = l(spellHeadingId);
+				if (!existingHeading) {
+					var spellHeading = document.createElement('h3');
+					spellHeading.id = spellHeadingId;
+					spellHeading.textContent = sp.name;
+					spellHeading.setAttribute('tabindex', '0');
+					spellHeading.style.cssText = 'display:block;font-size:12px;color:#fc0;margin:8px 0 2px 0;';
+					b.parentNode.insertBefore(spellHeading, b);
+				}
+
+				// 2. Add cost and status below heading
+				var costId = 'a11y-spell-cost-' + sp.id;
+				var existingCost = l(costId);
+				var costText = 'Cost: ' + cost + ' magic. ' + statusText + '.';
+				if (!existingCost) {
+					var costDiv = document.createElement('div');
+					costDiv.id = costId;
+					costDiv.setAttribute('tabindex', '0');
+					costDiv.style.cssText = 'display:block;font-size:11px;color:#aaa;margin:2px 0;';
+					costDiv.textContent = costText;
+					b.parentNode.insertBefore(costDiv, b);
+				} else {
+					existingCost.textContent = costText;
+				}
+
+				// 3. Add effect description
+				var effectId = 'a11y-spell-effect-' + sp.id;
+				var existingEffect = l(effectId);
+				var effectText = 'Effect: ' + MOD.stripHtml(sp.desc || '');
+				if (!existingEffect) {
+					var effectDiv = document.createElement('div');
+					effectDiv.id = effectId;
+					effectDiv.setAttribute('tabindex', '0');
+					effectDiv.style.cssText = 'display:block;font-size:10px;color:#999;margin:2px 0;';
+					effectDiv.textContent = effectText;
+					b.parentNode.insertBefore(effectDiv, b);
+				}
+
+				// 4. Create cast button (just spell name)
+				var castBtnId = 'a11y-spell-cast-' + sp.id;
+				var existingCastBtn = l(castBtnId);
+				var btnText = 'Cast ' + sp.name;
+				if (!existingCastBtn) {
+					var castBtn = document.createElement('button');
+					castBtn.id = castBtnId;
+					castBtn.type = 'button';
+					castBtn.textContent = btnText;
+					castBtn.style.cssText = 'display:block;font-size:11px;color:#fff;background:#333;border:1px solid #666;padding:5px 10px;margin:5px 0 10px 0;cursor:pointer;';
+					castBtn.addEventListener('click', function() {
+						grim.castSpell(sp);
+					});
+					// Insert after the original spell icon
+					if (b.nextSibling) {
+						b.parentNode.insertBefore(castBtn, b.nextSibling);
+					} else {
+						b.parentNode.appendChild(castBtn);
+					}
+				}
 			}
 		});
-	},
-	ensureSpellEffectText: function(spell, spellEl) {
-		var MOD = this;
-		try {
-			var textId = 'a11y-spell-effect-' + spell.id;
-			var existingText = l(textId);
-			if (!existingText) {
-				var effectDiv = document.createElement('div');
-				effectDiv.id = textId;
-				effectDiv.style.cssText = 'display:block;padding:4px;margin:2px 0;font-size:11px;color:#ccc;';
-				effectDiv.setAttribute('tabindex', '0');
-				effectDiv.textContent = 'Effect: ' + MOD.stripHtml(spell.desc || '');
-				if (spellEl.nextSibling) {
-					spellEl.parentNode.insertBefore(effectDiv, spellEl.nextSibling);
-				} else {
-					spellEl.parentNode.appendChild(effectDiv);
-				}
-			}
-		} catch(e) {}
 	},
 	enhanceStockMarketMinigame: function() {
 		var MOD = this, mkt = Game.Objects['Bank'] && Game.Objects['Bank'].minigame;

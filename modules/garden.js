@@ -180,10 +180,22 @@ var GardenModule = (function() {
 			g.useTool(g.seedSelected, x, y);
 			var seed = g.plantsById[g.seedSelected];
 			announce('Planted ' + (seed ? seed.name : 'seed') + ' at R' + (y + 1) + ', C' + (x + 1));
+			// Update ARIA labels after game processes the plant action
+			setTimeout(function() {
+				if (Game.mods && Game.mods['nvda accessibility']) {
+					Game.mods['nvda accessibility'].labelOriginalGardenElements(g);
+				}
+			}, 100);
 		} else if (!info.isEmpty && info.isMature) {
 			// Harvest mature plant
 			g.harvest(x, y);
 			announce('Harvested ' + info.name + ' from R' + (y + 1) + ', C' + (x + 1));
+			// Update ARIA labels after game processes the harvest action
+			setTimeout(function() {
+				if (Game.mods && Game.mods['nvda accessibility']) {
+					Game.mods['nvda accessibility'].labelOriginalGardenElements(g);
+				}
+			}, 100);
 		} else if (!info.isEmpty) {
 			announce(info.name + ' is not ready to harvest. ' + info.growth + '% grown');
 		} else {
