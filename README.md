@@ -1,4 +1,4 @@
-# Cookie Clicker NVDA Accessibility Mod
+# Cookie Clicker Access
 
 This mod makes Cookie Clicker more accessible with screen readers like NVDA. It works with both the Steam version and the web version (via Tampermonkey).
 
@@ -10,7 +10,7 @@ All code in this mod was written by Claude (Anthropic's AI assistant). Human inv
 
 ### Steam Version
 
-1. Download [Cookie-Clicker-NVDA-Mod.zip](https://github.com/FioraXena/Cookie-Clicker-Enhanced-NVDA-Accessibility-Steam-Only-/raw/main/Cookie-Clicker-NVDA-Mod.zip)
+1. Download the latest release from the [Releases page](https://github.com/Amsel142857/Cookie-Clicker-Access/releases)
 2. Extract the zip file
 3. Copy the "nvdaAccessibility" folder to your Cookie Clicker mods folder:
    `[Steam Install Path]\steamapps\common\Cookie Clicker\resources\app\mods\local\`
@@ -20,7 +20,7 @@ All code in this mod was written by Claude (Anthropic's AI assistant). Human inv
 
 **Quick Start:**
 1. Install [Tampermonkey](https://www.tampermonkey.net/) browser extension (Chrome, Firefox, Edge, Safari)
-2. Click this link to install the userscript: [cookie-clicker-accessibility.user.js](https://raw.githubusercontent.com/Amsel142857/Cookie-Clicker-Enhanced-NVDA-Accessibility-Steam-Only-/main/cookie-clicker-accessibility.user.js)
+2. Click this link to install the userscript: [cookie-clicker-accessibility.user.js](https://raw.githubusercontent.com/Amsel142857/Cookie-Clicker-Access/main/cookie-clicker-accessibility.user.js)
    - Tampermonkey should open and show the installation page
    - Click "Install" to add the script
 3. Visit [Cookie Clicker](https://orteil.dashnet.org/cookieclicker/) and the mod will load automatically
@@ -48,79 +48,149 @@ If you want to modify the mod and rebuild the userscript:
    ```
 4. The generated `cookie-clicker-accessibility.user.js` will contain all modules bundled together
 
-## Features
+## Getting Started
 
-### Core Interface
-- Buildings section organized under headings with accessible buttons
-- "Time until affordable" displayed for buildings and upgrades
-- Building production stats showing cookies per second (individual and total), plus percentage of total CPS
-- Cookies per click display below the Big Cookie
-- Milk progress display showing current milk type, rank, and percentage
-- News ticker accessible as a heading region
-- Bulk pricing support (buy 1, 10, 100, or max)
+When the mod loads, it announces "NVDA Accessibility mod version 11.7 loaded." The game interface is organized into navigable sections using headings:
 
-### Store and Upgrades
-- Upgrade shop with full labels showing name, cost, effects, and flavor text
-- Available Buildings region showing purchasable buildings
+- **News** (H2): The game's news ticker. Focusable but set to aria-live off to avoid noise.
+- **Store** (H2): Contains available upgrades and buildings.
+- **Buildings** (H3): The building purchase buttons within the store.
+- **Active Buffs** (H2): Shows current buffs with time remaining.
+- **Active Shimmers** (H2): Shows Golden Cookies, Wrath Cookies, or Reindeer that have spawned.
+- **Wrinklers** (H2): Shows active wrinklers with buttons to pop them.
 
-### Minigames
-- **Garden**: Virtual grid navigation with arrow keys, seed selection dialogs, harvestable plants section, soil selection with keyboard support
-- **Grimoire**: Spell names, costs, and effects displayed
-- **Pantheon**: Spirit placement with keyboard support
-- **Stock Market**: Stock prices and trading information accessible
+Use your screen reader's heading navigation (e.g., H key in NVDA browse mode) to jump between sections.
 
-### Prestige System
-- Ascension UI fully accessible for browsing and purchasing Heavenly upgrades
-- Permanent upgrade slots accessible via keyboard
+### Clicking the Big Cookie
 
-### Special Features
-- **Dragon (Krumblor)**: Aura slot selection accessible
-- **Santa**: Progress tracking accessible
-- **Shimmers**: Live announcements when Golden Cookies, Wrath Cookies, or Reindeer appear and when they're about to fade
-- **Wrinklers**: Spawn announcements, accessible buttons to pop wrinklers with cookie reward information
-- **Season changes**: Notifications when seasons change
-- **Active Buffs panel**: Shows current buffs and effects
-- **Sugar Lump timer**: Displays lump ripeness and harvest status
+The Big Cookie is labeled and can be clicked normally. Below it you will find displays for cookies per click, milk progress, and the current season.
 
-### Accessibility Enhancements
-- Live region announcements for important game events
-- Hidden FPS counter and irrelevant visual elements from screen readers
-- Proper ARIA labels throughout the interface
+### Buying Upgrades
+
+Upgrades appear in the Store section. Each upgrade is labeled with its name, cost, and effect description. If you cannot afford an upgrade, a "time until affordable" estimate is shown. Tab through the upgrades and press Enter or Space to purchase.
+
+### Buying Buildings
+
+Buildings appear under the Buildings heading. Each building shows its name, whether it is affordable, the cost (adjusted for bulk mode), and how many you own. Below each building is an info line showing production stats and time until affordable.
+
+Use the Buy/Sell toggle and the amount buttons (1, 10, 100, Max) at the top of the store to change purchase mode. These are all keyboard-accessible.
+
+Buildings you have not yet unlocked are hidden. Once you own a building, the next building in line becomes visible, plus one mystery building showing only its cost.
+
+### Ascending (Prestige)
+
+The Legacy button shows your potential prestige and heavenly chip gain. Press it to ascend.
+
+On the ascension screen, a Heavenly Chips counter appears at the top left showing your available chips. Heavenly upgrades are labeled with name, cost, and owned status. Tab through them and press Enter to purchase.
+
+Permanent upgrade slots (unlocked via heavenly upgrades) open a selection dialog when clicked. Use Arrow Up/Down to browse your owned upgrades, Enter to select one, or Escape to cancel.
+
+Press the Reincarnate button to start a new run.
+
+## Using the Minigames
+
+Minigames unlock at building level 1 (costs 1 sugar lump). Each building with a minigame has an Open/Close button that toggles the minigame panel.
+
+### Garden (Farm - Level 1)
+
+The Garden lets you grow plants in a 6x6 grid.
+
+**Grid Navigation:**
+1. Open the Farm minigame
+2. Tab to the "Enter Garden Grid" button and press Enter
+3. Use Arrow keys to move between tiles. Each tile announces its coordinates (R#, C#), any plant name, growth percentage, and whether it is ready to harvest.
+4. Press Enter or Space on an empty tile to plant your selected seed, or on a mature plant to harvest it
+5. Home jumps to R1, C1. End jumps to the last tile.
+6. Press Escape to exit grid navigation
+
+**Seeds:** Tab to the Seeds section to browse unlocked seeds. Click a seed to select it. A "Selected [name]" announcement confirms your choice.
+
+**Soil:** Tab to the Soil section. Each soil button shows its name, effects (tick rate, plant effect multiplier, etc.), and whether it is your current soil or locked behind a farm count requirement.
+
+**Tools:**
+- **Information** - Opens a collapsible panel showing current plant effects and gardening tips. Press again or Escape to close.
+- **Harvest All** - Harvests all plants, including immature ones.
+- **Harvest Mature Only** - Added by this mod. Safely harvests only fully grown plants.
+- **Freeze/Unfreeze** - Pauses all plant growth. Label updates to reflect current state.
+- **Sacrifice** - Destroys all plants and seeds for 10 sugar lumps. Announced as a warning.
+
+### Grimoire (Wizard Tower - Level 1)
+
+The Grimoire lets you cast spells using magic points.
+
+At the top of the Grimoire panel, a magic meter shows your current magic, maximum magic, and spells cast. Each spell is presented as:
+
+1. **Heading** (H3) with the spell name
+2. **Cost and status** line showing magic cost and whether you can cast
+3. **Effect** description
+4. **Cast button** to cast the spell
+
+### Pantheon (Temple - Level 1)
+
+The Pantheon lets you slot spirits into Diamond, Ruby, and Jade slots for various bonuses.
+
+**Slots** appear first. Each shows its name and current occupant (or "Empty"). Press Enter on an occupied slot to remove that spirit.
+
+**Spirits** appear below, each with an H3 heading, flavor text, and buff description. Each spirit has three placement buttons (D, R, J) to place it directly into a slot. Buttons are disabled for the slot the spirit currently occupies.
+
+Worship swaps are limited. The swap count is shown in the Pantheon heading. When no swaps are available, a cooldown timer is announced.
+
+### Stock Market (Bank - Level 1)
+
+Each stock row is labeled with the stock name, current price, shares owned, and trend direction (Rising, Falling, or Stable). Buy and Sell buttons are labeled per stock and keyboard-accessible.
+
+## Special Systems
+
+### Dragon (Krumblor)
+
+The Dragon tab appears once unlocked. Inside you can:
+- **Upgrade Krumblor** - The button shows the current dragon level
+- **Pet Krumblor** - Accessible button
+- **Set Dragon Auras** - Clicking an aura slot opens a dialog listing all available auras. Use Arrow Up/Down to browse, Enter to select, Escape to cancel.
+
+### Santa
+
+The Santa tab appears during the Christmas season. Inside:
+- **Upgrade Santa** - Shows current level out of 14
+- **Pet Santa** - Accessible button
+
+### Shimmers (Golden Cookies, Wrath Cookies, Reindeer)
+
+When a shimmer appears, the mod urgently announces it (e.g., "A Golden Cookie has appeared!"). Five seconds before it fades, a fading alert fires.
+
+The Active Shimmers panel shows clickable buttons for each shimmer with a countdown timer. Click or press Enter to collect.
+
+During Cookie Chains and Cookie Storms, individual shimmer announcements are suppressed to prevent spam. Start and end events are announced with totals.
+
+### Wrinklers
+
+When a wrinkler spawns, the mod announces it. The Wrinklers section shows a button per active wrinkler displaying how many cookies it has sucked. Click to pop it and recover cookies (110% return; 3x for shiny wrinklers).
+
+### Buffs
+
+The Active Buffs panel shows each current buff with its name, time remaining, and effect description. Buff start and end events are also announced via the live region.
+
+### Sugar Lumps
+
+The sugar lump button is labeled with the lump type (Normal, Bifurcated, Golden, Meaty, Caramelized), ripeness status with time estimates, and your current lump count. A one-time announcement fires when a lump becomes ripe.
+
+### Seasons
+
+The current season is shown in the main interface display. When seasons change, the mod announces the transition.
 
 ## Known Issues
 
-- **Statistics menu**: Some statistics content may not be fully accessible.
-- **Web version**: If the mod doesn't load, check the browser console (F12) for errors. Make sure you're using the bundled userscript (`cookie-clicker-accessibility.user.js`) and not the old version with `@require` directives.
+- **Statistics menu**: Some statistics content may not be fully accessible. Upgrades and achievements are labeled in batches to avoid freezing, but navigation can be slow with large collections.
+- **Music**: The mod automatically sets music volume to 0 on load. Adjust in game options if you want music.
+- **Screen reader mode**: The mod forces Cookie Clicker's built-in screen reader preference on. This creates ARIA reader labels that the mod then populates.
+- **Web version**: If the mod doesn't load, check the browser console (F12) for errors. Make sure you're using the bundled userscript (`cookie-clicker-accessibility.user.js`) and that Tampermonkey is enabled.
 
-## Changelog
+## Accessibility Notes
 
-### Version 11.7
-- Added bulk pricing support for buildings
-- Added News heading for ticker accessibility
-- Fixed buff list formatting issues
-- Fixed live region announcements to show only the latest message
-
-### Version 11
-- Garden coordinates standardized to R#, C# format
-- Improved garden responsiveness and soil labels
-- Fixed minigame buttons not detected by screen reader
-- Added season change notifications and current season display
-- Added Available Buildings region
-- Fixed wrinkler buttons not being read properly by NVDA
-- Added wrinkler spawn announcements
-- Improved shimmer fading alerts
-
-### Version 9
-- Garden minigame fully accessible with virtual grid navigation
-- Enter Garden Grid button for arrow key navigation
-- Seed selection dialog for empty plots
-- Harvestable plants and available seeds sections
-- Soil buttons work with keyboard (Enter/Space)
-- Hidden FPS counter and undefined elements from screen readers
-
-### Version 8
-- Pantheon accessibility improvements with keyboard support
-- Shimmer announcement system (removed buttons, kept live announcements)
+- The mod creates both a polite and an assertive live region. Urgent events (shimmer appearances, wrinkler spawns, veil breaks, achievement unlocks) use the assertive region. Routine updates (buff changes, garden actions) use the polite region. Only the latest message persists in each region to avoid stacking.
+- All interactive elements added by the mod support Enter and Space key activation.
+- Dialog boxes (Dragon Aura selection, Permanent Upgrade slot selection) trap focus and support Escape to dismiss.
+- The mod hides visual-only elements (FPS counter, floating numbers, milk layer, cookie number animations, undefined text) from screen readers using aria-hidden.
 
 ## Credits
 
